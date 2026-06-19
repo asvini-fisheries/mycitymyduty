@@ -66,7 +66,7 @@ export default function LoginPage() {
       const saved = getSelectedCorporationId();
       if (saved && corps.some((c) => c.id === saved)) {
         setCorporationId(saved);
-      } else if (corps.length === 1) {
+      } else if (corps.length > 0) {
         setCorporationId(corps[0].id);
       }
 
@@ -322,6 +322,22 @@ export default function LoginPage() {
               />
             )}
 
+            <Input
+              label="Email"
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+            <Input
+              label="Password"
+              type="password"
+              required
+              minLength={6}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+
             {showCorpSelect && (
               <div className="space-y-1">
                 <label
@@ -395,22 +411,6 @@ export default function LoginPage() {
                   corporation.
                 </p>
               )}
-
-            <Input
-              label="Email"
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-            <Input
-              label="Password"
-              type="password"
-              required
-              minLength={6}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
 
             {error && (
               <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>

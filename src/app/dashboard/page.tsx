@@ -1,23 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   Activity,
   Building2,
   FolderKanban,
-  Landmark,
   Receipt,
-  Users,
 } from "lucide-react";
-import { fetchCurrentUserProfile } from "@/lib/auth";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
 import { ensureLockedCorporation } from "@/lib/corporations";
-import { isSuperAdmin } from "@/lib/roles";
 
 interface Stats {
-  corporations: number;
-  stakeholders: number;
   projects: number;
   activities: number;
   dailyUpdates: number;
@@ -25,13 +19,6 @@ interface Stats {
 }
 
 const quickLinks = [
-  {
-    href: "/dashboard/masters/corporations",
-    label: "Corporations",
-    icon: Landmark,
-    superAdminOnly: true,
-  },
-  { href: "/dashboard/masters/stakeholders", label: "Stakeholders", icon: Users },
   { href: "/dashboard/masters/projects", label: "Projects", icon: FolderKanban },
   { href: "/dashboard/masters/activities", label: "Activities", icon: Activity },
   { href: "/dashboard/operations/daily-updates", label: "Daily Updates", icon: Building2 },
@@ -42,7 +29,6 @@ const quickLinks = [
 export default function DashboardPage() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [configured, setConfigured] = useState(true);
-  const [superAdmin, setSuperAdmin] = useState(false);
 
   useEffect(() => {
     if (!isSupabaseConfigured()) {
@@ -52,42 +38,21 @@ export default function DashboardPage() {
 
     async function loadStats() {
       const supabase = createClient();
-      const [profile, lockedId] = await Promise.all([
-        fetchCurrentUserProfile(supabase),
-        ensureLockedCorporation(supabase),
+      const lockedId = await ensureLockedCorporation(supabase);
+
+      const [projects, activities, dailyUpdates, bills] = await Promise.all([
+        lockedId
+          ? supabase
+              .from("projects")
+              .select("id", { count: "exact", head: true })
+              .eq("corporation_id", lockedId)
+          : supabase.from("projects").select("id", { count: "exact", head: true }),
+        supabase.from("activities").select("id", { count: "exact", head: true }),
+        supabase.from("daily_activity_updates").select("id", { count: "exact", head: true }),
+        supabase.from("stakeholder_bills").select("id", { count: "exact", head: true }),
       ]);
-      setSuperAdmin(isSuperAdmin(profile?.role));
-
-      const corpFilter = lockedId ? { corporation_id: lockedId } : undefined;
-
-      const [corporations, stakeholders, projects, activities, dailyUpdates, bills] =
-        await Promise.all([
-          lockedId
-            ? supabase
-                .from("corporations")
-                .select("id", { count: "exact", head: true })
-                .eq("id", lockedId)
-            : supabase.from("corporations").select("id", { count: "exact", head: true }),
-          corpFilter
-            ? supabase
-                .from("stakeholders")
-                .select("id", { count: "exact", head: true })
-                .eq("corporation_id", lockedId!)
-            : supabase.from("stakeholders").select("id", { count: "exact", head: true }),
-          corpFilter
-            ? supabase
-                .from("projects")
-                .select("id", { count: "exact", head: true })
-                .eq("corporation_id", lockedId!)
-            : supabase.from("projects").select("id", { count: "exact", head: true }),
-          supabase.from("activities").select("id", { count: "exact", head: true }),
-          supabase.from("daily_activity_updates").select("id", { count: "exact", head: true }),
-          supabase.from("stakeholder_bills").select("id", { count: "exact", head: true }),
-        ]);
 
       setStats({
-        corporations: corporations.count || 0,
-        stakeholders: stakeholders.count || 0,
         projects: projects.count || 0,
         activities: activities.count || 0,
         dailyUpdates: dailyUpdates.count || 0,
@@ -98,15 +63,8 @@ export default function DashboardPage() {
     loadStats();
   }, []);
 
-  const visibleQuickLinks = useMemo(
-    () => quickLinks.filter((link) => !link.superAdminOnly || superAdmin),
-    [superAdmin]
-  );
-
   const statCards = stats
     ? [
-        { label: "Corporations", value: stats.corporations },
-        { label: "Stakeholders", value: stats.stakeholders },
         { label: "Projects", value: stats.projects },
         { label: "Activities", value: stats.activities },
         { label: "Daily Updates", value: stats.dailyUpdates },
@@ -119,7 +77,7 @@ export default function DashboardPage() {
       <div>
         <h1 className="text-2xl font-bold text-civic-900">Dashboard</h1>
         <p className="mt-1 text-civic-600">
-          MyCityMyDuty — civic engagement and project operations
+          MyCityMyDuty — Greener City Healthier City
         </p>
       </div>
 
@@ -151,7 +109,7 @@ export default function DashboardPage() {
       <div>
         <h2 className="mb-4 text-lg font-semibold text-civic-900">Quick Links</h2>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {visibleQuickLinks.map((link) => {
+          {quickLinks.map((link) => {
             const Icon = link.icon;
             return (
               <Link
