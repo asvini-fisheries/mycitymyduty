@@ -59,3 +59,7 @@ mycitymyduty-application/
 ## Excel import/export
 
 Every master and transaction screen supports Excel template download, bulk upload, and filtered export via the toolbar on each page.
+
+## Deployment
+
+For Git remote setup and **Hostinger** (Node.js Web App) deployment — build commands, env vars, and Supabase production checklist — see [DEPLOY.md](./DEPLOY.md).
