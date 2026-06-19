@@ -1,0 +1,55 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f4f7fb;
+  --foreground: #0e2842;
+  --civic-50: #f3f8f6;
+  --civic-100: #e2ecf4;
+  --civic-200: #c3d8e8;
+  --civic-300: #8fb5d4;
+  --civic-400: #4a8fae;
+  --civic-500: #2f7a5c;
+  --civic-600: #256b8f;
+  --civic-700: #1e4f6f;
+  --civic-800: #163a57;
+  --civic-900: #0e2842;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-civic-50: var(--civic-50);
+  --color-civic-100: var(--civic-100);
+  --color-civic-200: var(--civic-200);
+  --color-civic-300: var(--civic-300);
+  --color-civic-400: var(--civic-400);
+  --color-civic-500: var(--civic-500);
+  --color-civic-600: var(--civic-600);
+  --color-civic-700: var(--civic-700);
+  --color-civic-800: var(--civic-800);
+  --color-civic-900: var(--civic-900);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+code {
+  font-family: var(--font-mono), monospace;
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: white;
+  }
+  @page {
+    margin: 12mm;
+  }
+}

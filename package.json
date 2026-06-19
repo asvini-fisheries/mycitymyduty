@@ -1,0 +1,43 @@
+{
+  "name": "mycitymyduty-application",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "db:migrate": "node scripts/run-migration.mjs 001_initial_schema.sql",
+    "db:migrate:fix": "node scripts/run-migration.mjs 002_signup_trigger_fix.sql",
+    "db:seed": "node scripts/run-migration.mjs 003_seed_data.sql",
+    "db:migrate:login": "node scripts/run-migration.mjs 008_login_corporation_access.sql",
+    "db:migrate:signup": "node scripts/run-migration.mjs 009_fix_auth_email.sql",
+    "db:migrate:rls": "node scripts/run-migration.mjs 010_fix_user_master_rls.sql",
+    "db:migrate:backfill": "node scripts/run-migration.mjs 011_backfill_user_master.sql",
+    "db:migrate:attachments": "node scripts/run-migration.mjs 012_record_attachments.sql",
+    "db:migrate:super-admin": "node scripts/run-migration.mjs 013_super_admin_corporation_logo.sql",
+    "db:setup-storage": "node scripts/setup-storage.mjs",
+    "db:verify": "node scripts/verify-setup.mjs",
+    "auth:disable-email-confirm": "node scripts/disable-email-confirm.mjs",
+    "auth:test-signup": "node scripts/test-signup.mjs"
+  },
+  "dependencies": {
+    "@supabase/ssr": "^0.12.0",
+    "@supabase/supabase-js": "^2.108.2",
+    "lucide-react": "^1.21.0",
+    "next": "16.2.9",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.2.9",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}
