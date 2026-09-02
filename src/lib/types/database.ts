@@ -7,6 +7,7 @@ export type UserRole =
   | "stakeholder"
   | "viewer";
 export type ProjectStatus = "planned" | "active" | "on_hold" | "completed" | "cancelled";
+export type ProjectRecordType = "project" | "requirement";
 export type BillStatus = "draft" | "submitted" | "approved" | "paid" | "rejected";
 export type PaymentMode = "cash" | "bank_transfer" | "upi" | "cheque";
 export type ApprovalStatus = "draft" | "submitted" | "approved" | "rejected";
@@ -55,6 +56,10 @@ export interface FieldConfig {
   accept?: string;
   /** Span full width in the form grid. */
   fullWidth?: boolean;
+  /** Show this field only when another field matches a value. */
+  visibleWhen?: { field: string; value: string | string[] };
+  /** Require this field only when another field matches a value. */
+  requiredWhen?: { field: string; value: string | string[] };
 }
 
 export interface ColumnConfig {
@@ -130,6 +135,7 @@ export interface Stakeholder {
 export interface Project extends GeoCoordinates, ApprovalWorkflow {
   id: string;
   corporation_id: string;
+  record_type: ProjectRecordType;
   ward_id: string | null;
   area_id: string | null;
   street_id: string | null;

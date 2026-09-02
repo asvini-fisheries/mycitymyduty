@@ -16,6 +16,7 @@
     "db:migrate:backfill": "node scripts/run-migration.mjs 011_backfill_user_master.sql",
     "db:migrate:attachments": "node scripts/run-migration.mjs 012_record_attachments.sql",
     "db:migrate:super-admin": "node scripts/run-migration.mjs 013_super_admin_corporation_logo.sql",
+    "db:migrate:record-type": "node scripts/run-migration.mjs 015_project_record_type.sql",
     "db:setup-storage": "node scripts/setup-storage.mjs",
     "db:verify": "node scripts/verify-setup.mjs",
     "auth:disable-email-confirm": "node scripts/disable-email-confirm.mjs",

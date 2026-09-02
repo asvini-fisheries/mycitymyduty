@@ -113,6 +113,11 @@ const projectStatusOptions = [
   { value: "cancelled", label: "Cancelled" },
 ];
 
+const projectRecordTypeOptions = [
+  { value: "project", label: "Project" },
+  { value: "requirement", label: "Requirement" },
+];
+
 const billStatusOptions = [
   { value: "draft", label: "Draft" },
   { value: "submitted", label: "Submitted" },
@@ -513,23 +518,60 @@ export const crudConfigs = {
     selectQuery:
       "*, corporations(name), zone_wards(ward_number, name), ward_areas(name), area_streets(name)",
     columns: [
+      {
+        key: "record_type",
+        label: "Type",
+        render: (row) => {
+          const value = row.record_type as string | undefined;
+          if (value === "project") return "Project";
+          if (value === "requirement") return "Requirement";
+          return value ?? "—";
+        },
+      },
       { key: "corporations.name", label: "Corporation" },
       { key: "zone_wards.ward_number", label: "Ward" },
       { key: "ward_areas.name", label: "Area" },
       { key: "area_streets.name", label: "Street" },
       { key: "code", label: "Code" },
-      { key: "name", label: "Project" },
+      { key: "name", label: "Name" },
       { key: "budget", label: "Budget (₹)" },
       { key: "status", label: "Status" },
       { key: "approval_status", label: "Approval" },
     ] as ColumnConfig[],
     fields: [
       { name: "corporation_id", label: "Corporation", type: "select", required: true, optionsFrom: corporationOptionsFrom },
-      { name: "ward_id", label: "Ward (optional)", type: "select", optionsFrom: wardOptionsFrom },
-      { name: "area_id", label: "Area (optional)", type: "select", optionsFrom: areaOptionsFrom },
-      { name: "street_id", label: "Street (optional)", type: "select", optionsFrom: streetOptionsFrom },
-      { name: "code", label: "Project Code", type: "text" },
-      { name: "name", label: "Project Name", type: "text", required: true },
+      {
+        name: "record_type",
+        label: "Type",
+        type: "select",
+        required: true,
+        options: projectRecordTypeOptions,
+        defaultValue: "project",
+        fullWidth: true,
+      },
+      {
+        name: "ward_id",
+        label: "Ward",
+        type: "select",
+        optionsFrom: wardOptionsFrom,
+        visibleWhen: { field: "record_type", value: "requirement" },
+      },
+      {
+        name: "area_id",
+        label: "Area",
+        type: "select",
+        optionsFrom: areaOptionsFrom,
+        visibleWhen: { field: "record_type", value: "requirement" },
+      },
+      {
+        name: "street_id",
+        label: "Street",
+        type: "select",
+        optionsFrom: streetOptionsFrom,
+        visibleWhen: { field: "record_type", value: "requirement" },
+      },
+      { name: "code", label: "Code", type: "text" },
+      { name: "name", label: "Name", type: "text", required: true },
       { name: "description", label: "Description", type: "textarea" },
       { name: "start_date", label: "Start Date", type: "date" },
       { name: "end_date", label: "End Date", type: "date" },

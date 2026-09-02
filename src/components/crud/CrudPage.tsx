@@ -42,6 +42,7 @@ import {
   injectLockedCorporationId,
   scopeOptionsSelectQuery,
 } from "@/lib/corporations";
+import { isFieldRequired, isFieldVisible } from "@/lib/field-conditions";
 
 interface CrudPageProps {
   title: string;
@@ -302,10 +303,28 @@ export function CrudPage({
     e.preventDefault();
     setSaving(true);
 
+    for (const f of formFields) {
+      if (!isFieldVisible(f, formData)) continue;
+      const required = isFieldRequired(f, formData);
+      const raw = formData[f.name];
+      if (required && (raw === "" || raw === undefined)) {
+        alert(`${f.label} is required.`);
+        setSaving(false);
+        return;
+      }
+    }
+
     const payload: Record<string, unknown> = {};
     formFields.forEach((f) => {
+      if (!isFieldVisible(f, formData)) {
+        if (["ward_id", "area_id", "street_id"].includes(f.name)) {
+          payload[f.name] = null;
+        }
+        return;
+      }
       const raw = formData[f.name];
-      if (raw === "" && !f.required) {
+      const required = isFieldRequired(f, formData);
+      if (raw === "" && !required) {
         payload[f.name] = null;
         return;
       }
@@ -413,6 +432,7 @@ export function CrudPage({
 
   function renderField(field: FieldConfig) {
     const value = formData[field.name] ?? "";
+    const required = isFieldRequired(field, formData);
 
     if (field.type === "attachments") {
       return (
@@ -428,7 +448,7 @@ export function CrudPage({
           recordId={editing ? String(editing[idKey]) : undefined}
           multiple={field.multiple ?? true}
           accept={field.accept}
-          required={field.required}
+          required={required}
         />
       );
     }
@@ -466,7 +486,7 @@ export function CrudPage({
           key={field.name}
           name={field.name}
           label={field.label}
-          required={field.required}
+          required={required}
           placeholder={field.placeholder}
           value={value}
           onChange={(e) =>
@@ -482,7 +502,7 @@ export function CrudPage({
           key={field.name}
           name={field.name}
           label={field.label}
-          required={field.required}
+          required={required}
           options={fieldOptions[field.name] || field.options || []}
           value={value}
           onChange={(e) =>
@@ -517,7 +537,7 @@ export function CrudPage({
         name={field.name}
         label={field.label}
         type={field.type}
-        required={field.required}
+        required={required}
         placeholder={field.placeholder}
         step={field.step}
         value={value}
@@ -803,7 +823,9 @@ export function CrudPage({
       >
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
-            {formFields.map((field) => (
+            {formFields
+              .filter((field) => isFieldVisible(field, formData))
+              .map((field) => (
               <div
                 key={field.name}
                 className={
