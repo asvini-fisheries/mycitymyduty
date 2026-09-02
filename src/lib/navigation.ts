@@ -123,6 +123,12 @@ export const navGroups: NavGroup[] = [
         moduleKey: MODULE_KEYS.stakeholder_access_rights,
       },
       {
+        href: "/dashboard/masters/stakeholder-allocations",
+        label: "Project Allocations",
+        icon: FolderKanban,
+        moduleKey: MODULE_KEYS.stakeholder_project_allocations,
+      },
+      {
         href: "/dashboard/masters/stakeholders",
         label: "Stakeholders",
         icon: Building2,

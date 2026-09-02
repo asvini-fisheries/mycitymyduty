@@ -19,10 +19,12 @@ import {
 } from "@/lib/access-rights";
 import type { ModuleKey } from "@/lib/modules";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
+import { fetchLockedStakeholder } from "@/lib/stakeholders";
 
 interface AccessContextValue {
   loading: boolean;
   profile: CurrentUserProfile | null;
+  stakeholderName: string | null;
   rights: AccessRightsMap;
   can: (moduleKey: ModuleKey | string | null | undefined, action?: AccessAction) => boolean;
   canPath: (pathname: string, action?: AccessAction) => boolean;
@@ -35,6 +37,7 @@ const AccessContext = createContext<AccessContextValue | null>(null);
 export function AccessProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<CurrentUserProfile | null>(null);
+  const [stakeholderName, setStakeholderName] = useState<string | null>(null);
   const [rights, setRights] = useState<AccessRightsMap>({});
 
   const refresh = useCallback(async () => {
@@ -54,8 +57,11 @@ export function AccessProvider({ children }: { children: React.ReactNode }) {
         nextProfile.stakeholder_id
       );
       setRights(nextRights);
+      const lockedStakeholder = await fetchLockedStakeholder(supabase);
+      setStakeholderName(lockedStakeholder?.name ?? null);
     } else {
       setRights({});
+      setStakeholderName(null);
     }
 
     setLoading(false);
@@ -81,13 +87,14 @@ export function AccessProvider({ children }: { children: React.ReactNode }) {
     () => ({
       loading,
       profile,
+      stakeholderName,
       rights,
       can,
       canPath,
       isStakeholder: profile?.role === "stakeholder",
       refresh,
     }),
-    [loading, profile, rights, can, canPath, refresh]
+    [loading, profile, stakeholderName, rights, can, canPath, refresh]
   );
 
   return (

@@ -4,12 +4,15 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
 import { ensureLockedCorporation } from "@/lib/corporations";
+import { useAccess } from "@/contexts/AccessContext";
+import { fetchAllocatedProjectIds } from "@/lib/stakeholders";
 import { Select } from "@/components/ui/Select";
 
 interface ProjectRow {
   id: string;
   name: string;
   code: string | null;
+  record_type: string | null;
   status: string;
   budget: number;
   corporations?: { name: string };
@@ -32,6 +35,12 @@ function formatProjectLocation(project: ProjectRow): string | null {
   return parts.length > 0 ? parts.join(" · ") : null;
 }
 
+function formatRecordType(value: string | null | undefined): string {
+  if (value === "project") return "Project";
+  if (value === "requirement") return "Requirement";
+  return value ?? "—";
+}
+
 interface ProjectStats {
   activityCount: number;
   updateCount: number;
@@ -42,10 +51,12 @@ interface ProjectStats {
 }
 
 export default function ProjectDashboardPage() {
+  const { isStakeholder, profile } = useAccess();
   const [projects, setProjects] = useState<ProjectRow[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [stats, setStats] = useState<ProjectStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [emptyMessage, setEmptyMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isSupabaseConfigured()) {
@@ -60,7 +71,7 @@ export default function ProjectDashboardPage() {
       let query = supabase
         .from("projects")
         .select(
-          "id, name, code, status, budget, corporations(name), zone_wards(ward_number, name), ward_areas(name), area_streets(name)"
+          "id, name, code, record_type, status, budget, corporations(name), zone_wards(ward_number, name), ward_areas(name), area_streets(name)"
         )
         .order("name");
 
@@ -68,16 +79,34 @@ export default function ProjectDashboardPage() {
         query = query.eq("corporation_id", lockedId);
       }
 
+      if (isStakeholder && profile?.stakeholder_id) {
+        const allocatedIds = await fetchAllocatedProjectIds(
+          supabase,
+          profile.stakeholder_id
+        );
+        if (allocatedIds.length === 0) {
+          setProjects([]);
+          setEmptyMessage(
+            "No projects or requirements have been allocated to your stakeholder yet."
+          );
+          setLoading(false);
+          return;
+        }
+        query = query.in("id", allocatedIds);
+      }
+
       const { data } = await query;
-      setProjects((data as unknown as ProjectRow[]) || []);
-      if (data?.length) {
-        setSelectedProjectId(data[0].id);
+      const rows = (data as unknown as ProjectRow[]) || [];
+      setProjects(rows);
+      setEmptyMessage(rows.length ? null : "No projects found.");
+      if (rows.length) {
+        setSelectedProjectId(rows[0].id);
       }
       setLoading(false);
     }
 
     loadProjects();
-  }, []);
+  }, [isStakeholder, profile?.stakeholder_id]);
 
   useEffect(() => {
     if (!selectedProjectId || !isSupabaseConfigured()) return;
@@ -91,24 +120,39 @@ export default function ProjectDashboardPage() {
         .eq("project_id", selectedProjectId);
 
       const paIds = (projectActivities || []).map((pa) => pa.id);
+      const stakeholderId = isStakeholder ? profile?.stakeholder_id : null;
 
       const [updates, funding, bills, payments] = await Promise.all([
         paIds.length
-          ? supabase
-              .from("daily_activity_updates")
-              .select("progress_pct")
-              .in("project_activity_id", paIds)
+          ? (() => {
+              let q = supabase
+                .from("daily_activity_updates")
+                .select("progress_pct")
+                .in("project_activity_id", paIds);
+              if (stakeholderId) q = q.eq("stakeholder_id", stakeholderId);
+              return q;
+            })()
           : Promise.resolve({ data: [] }),
         paIds.length
-          ? supabase
-              .from("activity_funding_stakeholders")
-              .select("committed_amount")
-              .in("project_activity_id", paIds)
+          ? (() => {
+              let q = supabase
+                .from("activity_funding_stakeholders")
+                .select("committed_amount")
+                .in("project_activity_id", paIds);
+              if (stakeholderId) q = q.eq("stakeholder_id", stakeholderId);
+              return q;
+            })()
           : Promise.resolve({ data: [] }),
-        supabase
-          .from("stakeholder_bills")
-          .select("amount, stakeholder_id"),
-        supabase.from("stakeholder_payments").select("amount"),
+        (() => {
+          let q = supabase.from("stakeholder_bills").select("amount, stakeholder_id");
+          if (stakeholderId) q = q.eq("stakeholder_id", stakeholderId);
+          return q;
+        })(),
+        (() => {
+          let q = supabase.from("stakeholder_payments").select("amount");
+          if (stakeholderId) q = q.eq("stakeholder_id", stakeholderId);
+          return q;
+        })(),
       ]);
 
       const updateRows = updates.data || [];
@@ -133,7 +177,7 @@ export default function ProjectDashboardPage() {
     }
 
     loadProjectStats();
-  }, [selectedProjectId]);
+  }, [selectedProjectId, isStakeholder, profile?.stakeholder_id]);
 
   const selectedProject = projects.find((p) => p.id === selectedProjectId);
   const selectedLocation = selectedProject ? formatProjectLocation(selectedProject) : null;
@@ -142,21 +186,41 @@ export default function ProjectDashboardPage() {
     return <p className="text-civic-600">Loading projects...</p>;
   }
 
+  if (projects.length === 0) {
+    return (
+      <div className="space-y-4">
+        <h1 className="text-2xl font-bold text-civic-900">Project Dashboard</h1>
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-6 text-sm text-amber-900">
+          {emptyMessage ??
+            "No allocated projects or requirements are available for your account."}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-civic-900">Project Dashboard</h1>
           <p className="mt-1 text-civic-600">
-            Progress, funding, and billing overview by project
+            {isStakeholder
+              ? "Allocated projects and requirements assigned to you"
+              : "Progress, funding, and billing overview by project"}
           </p>
         </div>
         <div className="w-full sm:w-72">
           <Select
-            label="Select Project"
+            label="Select Project / Requirement"
             options={projects.map((p) => ({
               value: p.id,
-              label: p.code ? `${p.code} — ${p.name}` : p.name,
+              label: [
+                formatRecordType(p.record_type),
+                p.code,
+                p.name,
+              ]
+                .filter(Boolean)
+                .join(" — "),
             }))}
             value={selectedProjectId}
             onChange={(e) => setSelectedProjectId(e.target.value)}
@@ -168,6 +232,9 @@ export default function ProjectDashboardPage() {
         <div className="rounded-xl border border-civic-100 bg-white p-6 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-civic-500">
+                {formatRecordType(selectedProject.record_type)}
+              </p>
               <h2 className="text-xl font-semibold text-civic-900">{selectedProject.name}</h2>
               <p className="text-sm text-civic-600">
                 {selectedProject.corporations?.name}

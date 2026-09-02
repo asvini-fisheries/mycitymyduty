@@ -52,12 +52,14 @@ type MemberRow = {
   stakeholders: StakeholderRow | StakeholderRow[] | null;
 };
 
-export async function findStakeholderByPhone(
+export async function findAllStakeholdersByPhone(
   supabase: SupabaseClient,
   phone: string
-): Promise<StakeholderLoginMatch | null> {
+): Promise<StakeholderLoginMatch[]> {
   const phoneDigits = normalizePhoneDigits(phone);
-  if (phoneDigits.length < 10) return null;
+  if (phoneDigits.length < 10) return [];
+
+  const matches = new Map<string, StakeholderLoginMatch>();
 
   const { data: members } = await supabase
     .from("stakeholder_members")
@@ -72,14 +74,14 @@ export async function findStakeholderByPhone(
       ? member.stakeholders[0]
       : member.stakeholders;
     if (!stakeholder?.is_active) continue;
-    return {
+    matches.set(stakeholder.id, {
       stakeholderId: stakeholder.id,
       stakeholderName: stakeholder.name,
       corporationId: stakeholder.corporation_id,
       categoryId: stakeholder.stakeholder_category_id,
       memberName: member.name,
       phoneDigits,
-    };
+    });
   }
 
   const { data: stakeholders } = await supabase
@@ -93,17 +95,33 @@ export async function findStakeholderByPhone(
     contact_person: string | null;
   })[] | null) ?? []) {
     if (!phonesMatch(stakeholder.phone, phoneDigits)) continue;
-    return {
+    if (matches.has(stakeholder.id)) continue;
+    matches.set(stakeholder.id, {
       stakeholderId: stakeholder.id,
       stakeholderName: stakeholder.name,
       corporationId: stakeholder.corporation_id,
       categoryId: stakeholder.stakeholder_category_id,
       memberName: stakeholder.contact_person ?? stakeholder.name,
       phoneDigits,
-    };
+    });
   }
 
-  return null;
+  return [...matches.values()].sort((a, b) =>
+    a.stakeholderName.localeCompare(b.stakeholderName)
+  );
+}
+
+export async function findStakeholderByPhone(
+  supabase: SupabaseClient,
+  phone: string,
+  stakeholderId?: string | null
+): Promise<StakeholderLoginMatch | null> {
+  const matches = await findAllStakeholdersByPhone(supabase, phone);
+  if (matches.length === 0) return null;
+  if (stakeholderId) {
+    return matches.find((m) => m.stakeholderId === stakeholderId) ?? null;
+  }
+  return matches.length === 1 ? matches[0] : null;
 }
 
 export async function provisionStakeholderUser(

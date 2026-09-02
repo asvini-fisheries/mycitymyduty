@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import {
+  findAllStakeholdersByPhone,
   findStakeholderByPhone,
   provisionStakeholderUser,
   STAKEHOLDER_DEV_OTP,
@@ -10,9 +11,14 @@ import { createAdminClient, hasAdminClientConfig } from "@/lib/supabase/admin";
 
 export async function POST(request: Request) {
   try {
-    const body = (await request.json()) as { phone?: string; otp?: string };
+    const body = (await request.json()) as {
+      phone?: string;
+      otp?: string;
+      stakeholderId?: string;
+    };
     const phone = body.phone?.trim() ?? "";
     const otp = body.otp?.trim() ?? "";
+    const stakeholderId = body.stakeholderId?.trim() || null;
 
     if (!phone) {
       return NextResponse.json({ error: "Mobile number is required." }, { status: 400 });
@@ -33,15 +39,36 @@ export async function POST(request: Request) {
     }
 
     const admin = createAdminClient();
-    const match = await findStakeholderByPhone(admin, phone);
+    const options = await findAllStakeholdersByPhone(admin, phone);
 
-    if (!match) {
+    if (options.length === 0) {
       return NextResponse.json(
         {
           error:
             "Mobile number not registered. Ask your corporation admin to add you as a stakeholder member.",
         },
         { status: 404 }
+      );
+    }
+
+    if (options.length > 1 && !stakeholderId) {
+      return NextResponse.json({
+        requiresSelection: true,
+        options: options.map((option) => ({
+          stakeholderId: option.stakeholderId,
+          stakeholderName: option.stakeholderName,
+          memberName: option.memberName,
+          corporationId: option.corporationId,
+        })),
+      });
+    }
+
+    const match = await findStakeholderByPhone(admin, phone, stakeholderId ?? options[0]?.stakeholderId);
+
+    if (!match) {
+      return NextResponse.json(
+        { error: "Selected stakeholder could not be verified for this mobile number." },
+        { status: 400 }
       );
     }
 
@@ -87,6 +114,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       ok: true,
       corporationId: match.corporationId,
+      stakeholderId: match.stakeholderId,
       stakeholderName: match.stakeholderName,
     });
   } catch (error) {

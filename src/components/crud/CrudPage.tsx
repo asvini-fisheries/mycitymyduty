@@ -49,8 +49,13 @@ import {
   getFieldLabel,
   type FieldOption,
 } from "@/lib/field-options";
-import { useModulePermissions } from "@/contexts/AccessContext";
+import { useModulePermissions, useAccess } from "@/contexts/AccessContext";
 import { TABLE_MODULE_MAP, type ModuleKey } from "@/lib/modules";
+import {
+  STAKEHOLDER_ID_FIELD,
+  hasStakeholderIdField,
+  injectLockedStakeholderId,
+} from "@/lib/stakeholders";
 
 interface CrudPageProps {
   title: string;
@@ -93,8 +98,10 @@ export function CrudPage({
   skipCorporationScope = false,
   moduleKey,
 }: CrudPageProps) {
+  const { isStakeholder, profile } = useAccess();
   const resolvedModuleKey = moduleKey ?? TABLE_MODULE_MAP[table];
   const permissions = useModulePermissions(resolvedModuleKey);
+  const lockedStakeholderId = isStakeholder ? profile?.stakeholder_id ?? null : null;
   const canCreate = allowCreate && (permissions.unrestricted || permissions.canCreate);
   const canEdit = permissions.unrestricted || permissions.canEdit;
   const canDelete = allowDelete && (permissions.unrestricted || permissions.canDelete);
@@ -123,8 +130,13 @@ export function CrudPage({
   const [pendingLogoFiles, setPendingLogoFiles] = useState<Record<string, File>>({});
 
   const formFields = useMemo(
-    () => fields.filter((field) => field.name !== CORPORATION_ID_FIELD),
-    [fields]
+    () =>
+      fields.filter((field) => {
+        if (field.name === CORPORATION_ID_FIELD) return false;
+        if (isStakeholder && field.name === STAKEHOLDER_ID_FIELD) return false;
+        return true;
+      }),
+    [fields, isStakeholder]
   );
 
   const attachmentFieldName = useMemo(
@@ -240,6 +252,15 @@ export function CrudPage({
 
     query = applyCorporationScopeToRowQuery(query, table, fields, lockedId);
 
+    if (lockedStakeholderId && hasStakeholderIdField(fields)) {
+      query = query.eq(STAKEHOLDER_ID_FIELD, lockedStakeholderId);
+    } else if (
+      lockedStakeholderId &&
+      table === "stakeholder_project_allocations"
+    ) {
+      query = query.eq(STAKEHOLDER_ID_FIELD, lockedStakeholderId);
+    }
+
     const { data, error: fetchError } = await query;
 
     if (fetchError) {
@@ -249,7 +270,7 @@ export function CrudPage({
       setRows((data as unknown as Row[]) || []);
     }
     setLoading(false);
-  }, [table, selectQuery, orderColumn, orderAscending, fields, skipCorporationScope]);
+  }, [table, selectQuery, orderColumn, orderAscending, fields, skipCorporationScope, lockedStakeholderId]);
 
   useEffect(() => {
     loadOptions();
@@ -267,7 +288,13 @@ export function CrudPage({
     fields.forEach((f) => {
       if (f.name === CORPORATION_ID_FIELD && corpId) {
         initial[f.name] = corpId;
-      } else if (f.type === "attachments") {
+        return;
+      }
+      if (f.name === STAKEHOLDER_ID_FIELD && lockedStakeholderId) {
+        initial[f.name] = lockedStakeholderId;
+        return;
+      }
+      if (f.type === "attachments") {
         initial[f.name] = "[]";
       } else if (f.defaultValue !== undefined) {
         initial[f.name] = String(f.defaultValue);
@@ -299,6 +326,10 @@ export function CrudPage({
     fields.forEach((f) => {
       if (f.name === CORPORATION_ID_FIELD && corpId) {
         initial[f.name] = corpId;
+        return;
+      }
+      if (f.name === STAKEHOLDER_ID_FIELD && lockedStakeholderId) {
+        initial[f.name] = lockedStakeholderId;
         return;
       }
       if (f.editValueFrom) {
@@ -397,10 +428,10 @@ export function CrudPage({
       }
     });
 
-    const scopedPayload = injectLockedCorporationId(
-      payload,
+    const scopedPayload = injectLockedStakeholderId(
+      injectLockedCorporationId(payload, fields, resolveLockedCorporationId()),
       fields,
-      resolveLockedCorporationId()
+      lockedStakeholderId
     );
 
     try {
@@ -608,7 +639,11 @@ export function CrudPage({
     let failed = 0;
 
     for (const { excelRowIndex, payload: row } of rowsToImport) {
-      const payload = injectLockedCorporationId({ ...row }, fields, corpId);
+      const payload = injectLockedStakeholderId(
+        injectLockedCorporationId({ ...row }, fields, corpId),
+        fields,
+        lockedStakeholderId
+      );
       const summary = summarizeImportRow(payload, formFields, fieldOptions);
       const { error } = await supabase.from(table).insert(payload);
 

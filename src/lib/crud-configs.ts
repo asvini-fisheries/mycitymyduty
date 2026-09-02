@@ -56,9 +56,9 @@ const serviceCategoryOptionsFrom = {
 const projectOptionsFrom = {
   table: "projects",
   valueKey: "id",
-  labelKeys: ["code", "name"],
+  labelKeys: ["record_type", "code", "name"],
   labelSeparator: " — ",
-  selectQuery: "id, code, name, record_type",
+  selectQuery: "id, record_type, code, name",
 };
 
 const activityOptionsFrom = {
@@ -409,6 +409,39 @@ export const crudConfigs = {
       { name: "can_edit", label: "Can Edit", type: "checkbox", defaultValue: false },
       { name: "can_delete", label: "Can Delete", type: "checkbox", defaultValue: false },
     ] as FieldConfig[],
+  },
+
+  stakeholderProjectAllocations: {
+    title: "Project / Requirement Allocations",
+    description: "Assign projects and requirements to stakeholders",
+    table: "stakeholder_project_allocations",
+    selectQuery:
+      "*, stakeholders(name), projects(name, code, record_type)",
+    columns: [
+      { key: "stakeholders.name", label: "Stakeholder" },
+      { key: "projects.record_type", label: "Type" },
+      { key: "projects.code", label: "Code" },
+      { key: "projects.name", label: "Project / Requirement" },
+      { key: "allocated_at", label: "Allocated On" },
+    ] as ColumnConfig[],
+    fields: [
+      {
+        name: "stakeholder_id",
+        label: "Stakeholder",
+        type: "select",
+        required: true,
+        optionsFrom: stakeholderOptionsFrom,
+      },
+      {
+        name: "project_id",
+        label: "Project / Requirement",
+        type: "select",
+        required: true,
+        optionsFrom: projectOptionsFrom,
+      },
+      { name: "notes", label: "Notes", type: "textarea", fullWidth: true },
+    ] as FieldConfig[],
+    orderBy: { column: "allocated_at", ascending: false },
   },
 
   stakeholders: {

@@ -18,7 +18,7 @@ import { useEffect, useState } from "react";
 
 export function Sidebar() {
   const pathname = usePathname();
-  const { can, profile, isStakeholder } = useAccess();
+  const { can, profile, isStakeholder, stakeholderName } = useAccess();
   const [corporationName, setCorporationName] = useState<string | null>(null);
   const [corporationLogoUrl, setCorporationLogoUrl] = useState<string | null>(null);
 
@@ -92,6 +92,14 @@ export function Sidebar() {
             title={corporationName}
           >
             {corporationName}
+          </p>
+        )}
+        {isStakeholder && stakeholderName && (
+          <p
+            className="line-clamp-2 text-xs font-semibold leading-snug text-civic-200"
+            title={stakeholderName}
+          >
+            {stakeholderName}
           </p>
         )}
         <p className="text-xs font-medium text-civic-300">

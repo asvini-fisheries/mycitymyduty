@@ -39,10 +39,12 @@ export async function updateSession(request: NextRequest) {
     return supabaseResponse;
   }
 
-  const isLoginPage = request.nextUrl.pathname.startsWith("/login");
-  const isPublic = isLoginPage;
+  const pathname = request.nextUrl.pathname;
+  const isLoginPage = pathname.startsWith("/login");
+  const isAuthApi = pathname.startsWith("/api/auth/");
+  const isPublic = isLoginPage || isAuthApi;
 
-  if (!user && !isPublic && request.nextUrl.pathname !== "/") {
+  if (!user && !isPublic && pathname !== "/") {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = "/login";
     return NextResponse.redirect(redirectUrl);
