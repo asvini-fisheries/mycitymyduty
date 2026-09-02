@@ -35,6 +35,14 @@ export function formatCellValue(value: unknown): string {
   return String(value);
 }
 
+export function formatCellValueForColumn(columnKey: string, value: unknown): string {
+  if (columnKey === "record_type") {
+    if (value === "project") return "Project";
+    if (value === "requirement") return "Requirement";
+  }
+  return formatCellValue(value);
+}
+
 function columnMatchesSelectField(
   columnKey: string,
   optionsFrom: NonNullable<FieldConfig["optionsFrom"]>

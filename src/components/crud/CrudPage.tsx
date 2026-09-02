@@ -18,6 +18,7 @@ import {
   applySearchAndFilters,
   deriveFilterableColumns,
   formatCellValue,
+  formatCellValueForColumn,
   getActiveFilterChips,
   getNestedValue,
 } from "@/lib/crud-filters";
@@ -748,7 +749,10 @@ export function CrudPage({
                       <td key={col.key} className="px-4 py-3 text-civic-700">
                         {col.render
                           ? col.render(row)
-                          : formatCellValue(getNestedValue(row, col.key))}
+                          : formatCellValueForColumn(
+                              col.key,
+                              getNestedValue(row, col.key)
+                            )}
                       </td>
                     ))}
                     <td className="px-4 py-3">

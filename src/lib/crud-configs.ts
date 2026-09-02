@@ -518,16 +518,7 @@ export const crudConfigs = {
     selectQuery:
       "*, corporations(name), zone_wards(ward_number, name), ward_areas(name), area_streets(name)",
     columns: [
-      {
-        key: "record_type",
-        label: "Type",
-        render: (row) => {
-          const value = row.record_type as string | undefined;
-          if (value === "project") return "Project";
-          if (value === "requirement") return "Requirement";
-          return value ?? "—";
-        },
-      },
+      { key: "record_type", label: "Type" },
       { key: "corporations.name", label: "Corporation" },
       { key: "zone_wards.ward_number", label: "Ward" },
       { key: "ward_areas.name", label: "Area" },
