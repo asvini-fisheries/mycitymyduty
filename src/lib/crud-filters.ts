@@ -36,7 +36,10 @@ export function formatCellValue(value: unknown): string {
 }
 
 export function formatCellValueForColumn(columnKey: string, value: unknown): string {
-  if (columnKey === "record_type") {
+  if (
+    columnKey === "record_type" ||
+    columnKey === "projects.record_type"
+  ) {
     if (value === "project") return "Project";
     if (value === "requirement") return "Requirement";
   }

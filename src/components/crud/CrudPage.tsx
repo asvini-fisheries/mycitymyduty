@@ -44,6 +44,13 @@ import {
   scopeOptionsSelectQuery,
 } from "@/lib/corporations";
 import { isFieldRequired, isFieldVisible } from "@/lib/field-conditions";
+import {
+  filterOptionsForField,
+  getFieldLabel,
+  type FieldOption,
+} from "@/lib/field-options";
+import { useModulePermissions } from "@/contexts/AccessContext";
+import { TABLE_MODULE_MAP, type ModuleKey } from "@/lib/modules";
 
 interface CrudPageProps {
   title: string;
@@ -54,6 +61,7 @@ interface CrudPageProps {
   selectQuery?: string;
   orderBy?: { column: string; ascending?: boolean };
   idKey?: string;
+  moduleKey?: ModuleKey;
   allowCreate?: boolean;
   allowDelete?: boolean;
   allowExcelImport?: boolean;
@@ -83,7 +91,15 @@ export function CrudPage({
   printVoucher,
   defaultLatestCorporation = false,
   skipCorporationScope = false,
+  moduleKey,
 }: CrudPageProps) {
+  const resolvedModuleKey = moduleKey ?? TABLE_MODULE_MAP[table];
+  const permissions = useModulePermissions(resolvedModuleKey);
+  const canCreate = allowCreate && (permissions.unrestricted || permissions.canCreate);
+  const canEdit = permissions.unrestricted || permissions.canEdit;
+  const canDelete = allowDelete && (permissions.unrestricted || permissions.canDelete);
+  const canImport =
+    allowExcelImport && (permissions.unrestricted || permissions.canCreate);
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -95,7 +111,7 @@ export function CrudPage({
     null
   );
   const [fieldOptions, setFieldOptions] = useState<
-    Record<string, { value: string; label: string }[]>
+    Record<string, FieldOption[]>
   >({});
   const [viewerOpen, setViewerOpen] = useState(false);
   const [viewerAttachments, setViewerAttachments] = useState<RecordAttachment[]>(
@@ -153,7 +169,7 @@ export function CrudPage({
       : await ensureLockedCorporation(supabase);
     setLockedCorporationId(lockedId);
 
-    const opts: Record<string, { value: string; label: string }[]> = {};
+    const opts: Record<string, FieldOption[]> = {};
 
     for (const field of fields) {
       if (field.name === CORPORATION_ID_FIELD) {
@@ -163,6 +179,7 @@ export function CrudPage({
         opts[field.name] = field.options;
       } else if (field.optionsFrom) {
         const of = field.optionsFrom;
+        const filterCfg = of.filterByFormField;
         const scopedSelect = scopeOptionsSelectQuery(of, lockedId);
         let query = supabase.from(of.table).select(scopedSelect);
         query = applyCorporationScopeToOptionsQuery(query, of, lockedId);
@@ -179,6 +196,13 @@ export function CrudPage({
                 .filter(Boolean)
                 .join(of.labelSeparator ?? " — ")
             : String(row[of.labelKey!]),
+          ...(filterCfg
+            ? {
+                filterValue: String(
+                  getNestedValue(row, filterCfg.rowKey) ?? ""
+                ),
+              }
+            : {}),
         }));
       }
     }
@@ -258,6 +282,16 @@ export function CrudPage({
     setModalOpen(true);
   }
 
+  function updateFormField(field: FieldConfig, nextValue: string) {
+    setFormData((prev) => {
+      const next = { ...prev, [field.name]: nextValue };
+      for (const cleared of field.clearsOnChange ?? []) {
+        next[cleared] = "";
+      }
+      return next;
+    });
+  }
+
   function openEdit(row: Row) {
     setEditing(row);
     const corpId = resolveLockedCorporationId();
@@ -265,6 +299,12 @@ export function CrudPage({
     fields.forEach((f) => {
       if (f.name === CORPORATION_ID_FIELD && corpId) {
         initial[f.name] = corpId;
+        return;
+      }
+      if (f.editValueFrom) {
+        const nested = getNestedValue(row, f.editValueFrom);
+        initial[f.name] =
+          nested !== null && nested !== undefined ? String(nested) : "";
         return;
       }
       const val = row[f.name];
@@ -309,7 +349,7 @@ export function CrudPage({
       const required = isFieldRequired(f, formData);
       const raw = formData[f.name];
       if (required && (raw === "" || raw === undefined)) {
-        alert(`${f.label} is required.`);
+        alert(`${getFieldLabel(f, formData)} is required.`);
         setSaving(false);
         return;
       }
@@ -317,6 +357,7 @@ export function CrudPage({
 
     const payload: Record<string, unknown> = {};
     formFields.forEach((f) => {
+      if (f.formOnly) return;
       if (!isFieldVisible(f, formData)) {
         if (["ward_id", "area_id", "street_id"].includes(f.name)) {
           payload[f.name] = null;
@@ -434,13 +475,14 @@ export function CrudPage({
   function renderField(field: FieldConfig) {
     const value = formData[field.name] ?? "";
     const required = isFieldRequired(field, formData);
+    const label = getFieldLabel(field, formData);
 
     if (field.type === "attachments") {
       return (
         <AttachmentField
           key={field.name}
           name={field.name}
-          label={field.label}
+          label={label}
           value={value}
           onChange={(next) =>
             setFormData((prev) => ({ ...prev, [field.name]: next }))
@@ -459,7 +501,7 @@ export function CrudPage({
         <LogoUploadField
           key={field.name}
           name={field.name}
-          label={field.label}
+          label={label}
           value={value}
           onChange={(next) =>
             setFormData((prev) => ({ ...prev, [field.name]: next }))
@@ -486,7 +528,7 @@ export function CrudPage({
         <Textarea
           key={field.name}
           name={field.name}
-          label={field.label}
+          label={label}
           required={required}
           placeholder={field.placeholder}
           value={value}
@@ -498,17 +540,21 @@ export function CrudPage({
     }
 
     if (field.type === "select") {
+      const selectOptions = filterOptionsForField(
+        field,
+        fieldOptions[field.name] || field.options || [],
+        formData
+      );
+
       return (
         <Select
           key={field.name}
           name={field.name}
-          label={field.label}
+          label={label}
           required={required}
-          options={fieldOptions[field.name] || field.options || []}
+          options={selectOptions}
           value={value}
-          onChange={(e) =>
-            setFormData((prev) => ({ ...prev, [field.name]: e.target.value }))
-          }
+          onChange={(e) => updateFormField(field, e.target.value)}
         />
       );
     }
@@ -536,7 +582,7 @@ export function CrudPage({
       <Input
         key={field.name}
         name={field.name}
-        label={field.label}
+        label={label}
         type={field.type}
         required={required}
         placeholder={field.placeholder}
@@ -648,7 +694,7 @@ export function CrudPage({
               <p className="mt-1 text-sm text-civic-600">{description}</p>
             )}
           </div>
-          <Button onClick={openCreate} disabled={!allowCreate}>
+          <Button onClick={openCreate} disabled={!canCreate}>
             <Plus className="mr-2 h-4 w-4" />
             Add New
           </Button>
@@ -662,7 +708,7 @@ export function CrudPage({
           totalRowCount={rows.length}
           isFilterActive={isFilterActive}
           fieldOptions={fieldOptions}
-          allowImport={allowExcelImport}
+          allowImport={canImport}
           onImport={handleImport}
         />
         {!loading && !error && rows.length > 0 && (
@@ -790,6 +836,7 @@ export function CrudPage({
                           size="sm"
                           onClick={() => openEdit(row)}
                           aria-label="Edit"
+                          disabled={!canEdit}
                         >
                           <Pencil className="h-4 w-4" />
                         </Button>
@@ -798,7 +845,7 @@ export function CrudPage({
                           size="sm"
                           onClick={() => handleDelete(row)}
                           aria-label="Delete"
-                          disabled={!allowDelete}
+                          disabled={!canDelete}
                         >
                           <Trash2 className="h-4 w-4 text-red-600" />
                         </Button>

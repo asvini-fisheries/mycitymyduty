@@ -45,9 +45,19 @@ export interface FieldConfig {
     labelKeys?: string[];
     labelSeparator?: string;
     selectQuery?: string;
+    /** Filter dropdown options by a form field value (e.g. project record type). */
+    filterByFormField?: { formField: string; rowKey: string };
   };
   defaultValue?: string | number | boolean;
   step?: string;
+  /** When true, field is shown in the form but not saved to the database. */
+  formOnly?: boolean;
+  /** On edit, populate from a nested row path (e.g. projects.record_type). */
+  editValueFrom?: string;
+  /** Change label based on another form field's value. */
+  dynamicLabel?: { field: string; labels: Record<string, string> };
+  /** Clear these form fields when this field changes. */
+  clearsOnChange?: string[];
   /** When true, textarea value is split into a TEXT[] on save (one entry per line). */
   arrayField?: boolean;
   /** For attachments fields: allow multiple images. */

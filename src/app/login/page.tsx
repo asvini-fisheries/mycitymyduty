@@ -440,6 +440,12 @@ export default function LoginPage() {
               {isSignUp ? "Sign in" : "Create admin account"}
             </button>
           </p>
+          <p className="mt-3 text-center text-sm text-civic-600">
+            Stakeholder user?{" "}
+            <a href="/login/stakeholder" className="font-medium text-civic-700 hover:underline">
+              Sign in with mobile OTP
+            </a>
+          </p>
         </div>
       </div>
     </div>

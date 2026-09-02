@@ -17,6 +17,8 @@ export interface CurrentUserProfile {
   full_name: string | null;
   role: UserRole;
   corporation_id: string | null;
+  stakeholder_id: string | null;
+  phone: string | null;
 }
 
 export async function fetchCurrentUserProfile(
@@ -29,7 +31,7 @@ export async function fetchCurrentUserProfile(
 
   const { data } = await supabase
     .from("user_master")
-    .select("id, email, full_name, role, corporation_id")
+    .select("id, email, full_name, role, corporation_id, stakeholder_id, phone")
     .eq("id", user.id)
     .maybeSingle();
 

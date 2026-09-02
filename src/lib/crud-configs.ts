@@ -1,4 +1,5 @@
 import type { ColumnConfig, FieldConfig } from "@/lib/types/database";
+import { APP_MODULE_OPTIONS } from "@/lib/modules";
 
 const corporationOptionsFrom = {
   table: "corporations",
@@ -57,7 +58,7 @@ const projectOptionsFrom = {
   valueKey: "id",
   labelKeys: ["code", "name"],
   labelSeparator: " — ",
-  selectQuery: "id, code, name",
+  selectQuery: "id, code, name, record_type",
 };
 
 const activityOptionsFrom = {
@@ -175,14 +176,7 @@ const transactionalAttachmentsField = attachmentsField(true);
 /** Master screens — multiple enabled for consistency. */
 const masterAttachmentsField = attachmentsField(true);
 
-const appModules = [
-  { value: "masters", label: "Masters" },
-  { value: "projects", label: "Projects" },
-  { value: "activities", label: "Activities" },
-  { value: "daily_updates", label: "Daily Updates" },
-  { value: "billing", label: "Billing & Payments" },
-  { value: "dashboard", label: "Dashboard" },
-];
+const appModules = APP_MODULE_OPTIONS;
 
 export const crudConfigs = {
   users: {
@@ -402,8 +396,14 @@ export const crudConfigs = {
     ] as ColumnConfig[],
     fields: [
       { name: "stakeholder_category_id", label: "Stakeholder Category", type: "select", required: true, optionsFrom: stakeholderCategoryOptionsFrom },
-      { name: "module_key", label: "Module Key", type: "select", required: true, options: appModules },
-      { name: "module_label", label: "Module Label", type: "text", required: true },
+      { name: "module_key", label: "Screen / Module", type: "select", required: true, options: appModules },
+      {
+        name: "module_label",
+        label: "Module Label",
+        type: "text",
+        required: true,
+        placeholder: "Auto-filled from module selection",
+      },
       { name: "can_view", label: "Can View", type: "checkbox", defaultValue: true },
       { name: "can_create", label: "Can Create", type: "checkbox", defaultValue: false },
       { name: "can_edit", label: "Can Edit", type: "checkbox", defaultValue: false },
@@ -597,11 +597,12 @@ export const crudConfigs = {
 
   projectActivities: {
     title: "Project-wise Activities",
-    description: "Activities mapped to each project",
+    description: "Activities mapped to projects and requirements",
     table: "project_activities",
-    selectQuery: "*, projects(name, code), activities(name)",
+    selectQuery: "*, projects(name, code, record_type), activities(name)",
     columns: [
-      { key: "projects.name", label: "Project" },
+      { key: "projects.record_type", label: "Type" },
+      { key: "projects.name", label: "Project / Requirement" },
       { key: "activities.name", label: "Activity" },
       { key: "planned_start", label: "Start" },
       { key: "planned_end", label: "End" },
@@ -609,7 +610,38 @@ export const crudConfigs = {
       { key: "status", label: "Status" },
     ] as ColumnConfig[],
     fields: [
-      { name: "project_id", label: "Project", type: "select", required: true, optionsFrom: projectOptionsFrom },
+      {
+        name: "project_record_type",
+        label: "Type",
+        type: "select",
+        required: true,
+        options: projectRecordTypeOptions,
+        defaultValue: "project",
+        formOnly: true,
+        editValueFrom: "projects.record_type",
+        clearsOnChange: ["project_id"],
+        fullWidth: true,
+      },
+      {
+        name: "project_id",
+        label: "Project",
+        type: "select",
+        required: true,
+        optionsFrom: {
+          ...projectOptionsFrom,
+          filterByFormField: {
+            formField: "project_record_type",
+            rowKey: "record_type",
+          },
+        },
+        dynamicLabel: {
+          field: "project_record_type",
+          labels: {
+            project: "Project",
+            requirement: "Requirement",
+          },
+        },
+      },
       { name: "activity_id", label: "Activity", type: "select", required: true, optionsFrom: activityOptionsFrom },
       { name: "planned_start", label: "Planned Start", type: "date" },
       { name: "planned_end", label: "Planned End", type: "date" },

@@ -1,41 +1,33 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LogOut } from "lucide-react";
-import { fetchCurrentUserProfile } from "@/lib/auth";
+import { useAccess } from "@/contexts/AccessContext";
 import { navGroups } from "@/lib/navigation";
 import {
   clearSelectedCorporationId,
   fetchLockedCorporation,
 } from "@/lib/corporations";
 import { isSuperAdmin } from "@/lib/roles";
-import type { UserRole } from "@/lib/types/database";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
+import { useEffect, useState } from "react";
 
 export function Sidebar() {
   const pathname = usePathname();
+  const { can, profile, isStakeholder } = useAccess();
   const [corporationName, setCorporationName] = useState<string | null>(null);
   const [corporationLogoUrl, setCorporationLogoUrl] = useState<string | null>(null);
-  const [userRole, setUserRole] = useState<UserRole | null>(null);
 
   useEffect(() => {
     async function loadContext() {
       if (!isSupabaseConfigured()) return;
 
       const supabase = createClient();
-      const [profile, corp] = await Promise.all([
-        fetchCurrentUserProfile(supabase),
-        fetchLockedCorporation(supabase),
-      ]);
-
-      if (profile?.role) {
-        setUserRole(profile.role);
-      }
-
+      const corp = await fetchLockedCorporation(supabase);
       if (!corp) return;
 
       setCorporationName(corp.name);
@@ -46,20 +38,24 @@ export function Sidebar() {
   }, []);
 
   const visibleNavGroups = useMemo(() => {
-    const superAdmin = isSuperAdmin(userRole);
+    const superAdmin = isSuperAdmin(profile?.role);
     return navGroups
       .map((group) => ({
         ...group,
-        items: group.items.filter((item) => !item.superAdminOnly || superAdmin),
+        items: group.items.filter((item) => {
+          if (item.superAdminOnly && !superAdmin) return false;
+          if (isStakeholder) return can(item.moduleKey, "view");
+          return true;
+        }),
       }))
       .filter((group) => group.items.length > 0);
-  }, [userRole]);
+  }, [can, isStakeholder, profile?.role]);
 
   async function handleLogout() {
     const supabase = createClient();
     await supabase.auth.signOut();
     clearSelectedCorporationId();
-    window.location.href = "/login";
+    window.location.href = isStakeholder ? "/login/stakeholder" : "/login";
   }
 
   return (
@@ -98,11 +94,19 @@ export function Sidebar() {
             {corporationName}
           </p>
         )}
-        <p className="text-xs font-medium text-civic-300">MyCityMyDuty</p>
+        <p className="text-xs font-medium text-civic-300">
+          {isStakeholder ? "Stakeholder Portal" : "MyCityMyDuty"}
+        </p>
       </div>
 
       <nav className="flex-1 overflow-y-auto px-3 py-4">
-        {visibleNavGroups.map((group) => (
+        {visibleNavGroups.length === 0 && isStakeholder ? (
+          <p className="px-3 text-sm text-civic-300">
+            No screens assigned yet. Contact your corporation admin to configure
+            access rights for your stakeholder category.
+          </p>
+        ) : (
+          visibleNavGroups.map((group) => (
           <div key={group.title} className="mb-5">
             <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-civic-400">
               {group.title}
@@ -132,7 +136,8 @@ export function Sidebar() {
               })}
             </ul>
           </div>
-        ))}
+          ))
+        )}
       </nav>
 
       <div className="border-t border-civic-800 p-3">
