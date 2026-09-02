@@ -47,6 +47,13 @@ const stakeholderOptionsFrom = {
   labelKey: "name",
 };
 
+const stakeholderOptionsFromWithCategory = {
+  table: "stakeholders",
+  valueKey: "id",
+  labelKey: "name",
+  selectQuery: "id, name, stakeholder_category_id",
+};
+
 const serviceCategoryOptionsFrom = {
   table: "service_categories",
   valueKey: "id",
@@ -416,9 +423,10 @@ export const crudConfigs = {
     description: "Assign projects and requirements to stakeholders",
     table: "stakeholder_project_allocations",
     selectQuery:
-      "*, stakeholders(name), projects(name, code, record_type)",
+      "*, stakeholders(name, stakeholder_category_id, stakeholder_categories(name)), projects(name, code, record_type)",
     columns: [
       { key: "stakeholders.name", label: "Stakeholder" },
+      { key: "stakeholders.stakeholder_categories.name", label: "Category" },
       { key: "projects.record_type", label: "Type" },
       { key: "projects.code", label: "Code" },
       { key: "projects.name", label: "Project / Requirement" },
@@ -426,18 +434,59 @@ export const crudConfigs = {
     ] as ColumnConfig[],
     fields: [
       {
-        name: "stakeholder_id",
-        label: "Stakeholder",
+        name: "project_record_type",
+        label: "Type",
         type: "select",
         required: true,
-        optionsFrom: stakeholderOptionsFrom,
+        options: projectRecordTypeOptions,
+        defaultValue: "project",
+        formOnly: true,
+        editValueFrom: "projects.record_type",
+        clearsOnChange: ["project_id"],
+        fullWidth: true,
       },
       {
         name: "project_id",
         label: "Project / Requirement",
         type: "select",
         required: true,
-        optionsFrom: projectOptionsFrom,
+        optionsFrom: {
+          ...projectOptionsFrom,
+          filterByFormField: {
+            formField: "project_record_type",
+            rowKey: "record_type",
+          },
+        },
+        dynamicLabel: {
+          field: "project_record_type",
+          labels: {
+            project: "Project",
+            requirement: "Requirement",
+          },
+        },
+      },
+      {
+        name: "stakeholder_category_id",
+        label: "Stakeholder Category",
+        type: "select",
+        required: true,
+        optionsFrom: stakeholderCategoryOptionsFrom,
+        formOnly: true,
+        editValueFrom: "stakeholders.stakeholder_category_id",
+        clearsOnChange: ["stakeholder_id"],
+      },
+      {
+        name: "stakeholder_id",
+        label: "Stakeholder",
+        type: "select",
+        required: true,
+        optionsFrom: {
+          ...stakeholderOptionsFromWithCategory,
+          filterByFormField: {
+            formField: "stakeholder_category_id",
+            rowKey: "stakeholder_category_id",
+          },
+        },
       },
       { name: "notes", label: "Notes", type: "textarea", fullWidth: true },
     ] as FieldConfig[],

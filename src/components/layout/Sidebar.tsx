@@ -4,13 +4,9 @@ import { useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LogOut } from "lucide-react";
 import { useAccess } from "@/contexts/AccessContext";
 import { navGroups } from "@/lib/navigation";
-import {
-  clearSelectedCorporationId,
-  fetchLockedCorporation,
-} from "@/lib/corporations";
+import { fetchLockedCorporation } from "@/lib/corporations";
 import { isSuperAdmin } from "@/lib/roles";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
@@ -50,13 +46,6 @@ export function Sidebar() {
       }))
       .filter((group) => group.items.length > 0);
   }, [can, isStakeholder, profile?.role]);
-
-  async function handleLogout() {
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    clearSelectedCorporationId();
-    window.location.href = isStakeholder ? "/login/stakeholder" : "/login";
-  }
 
   return (
     <aside className="flex w-64 flex-col border-r border-civic-100 bg-civic-900 text-white">
@@ -147,16 +136,6 @@ export function Sidebar() {
           ))
         )}
       </nav>
-
-      <div className="border-t border-civic-800 p-3">
-        <button
-          onClick={handleLogout}
-          className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-civic-200 hover:bg-civic-800 hover:text-white"
-        >
-          <LogOut className="h-4 w-4" />
-          Sign out
-        </button>
-      </div>
     </aside>
   );
 }

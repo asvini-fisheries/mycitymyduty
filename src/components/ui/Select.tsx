@@ -3,9 +3,10 @@ import { cn } from "@/lib/utils";
 interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
   label?: string;
   options: { value: string; label: string }[];
+  emptyLabel?: string;
 }
 
-export function Select({ label, options, className, id, ...props }: SelectProps) {
+export function Select({ label, options, className, id, emptyLabel, ...props }: SelectProps) {
   const selectId = id || props.name;
   return (
     <div className="space-y-1">
@@ -24,7 +25,7 @@ export function Select({ label, options, className, id, ...props }: SelectProps)
         )}
         {...props}
       >
-        <option value="">Select...</option>
+        <option value="">{emptyLabel ?? "Select..."}</option>
         {options.map((opt) => (
           <option key={opt.value} value={opt.value}>
             {opt.label}

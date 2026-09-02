@@ -68,6 +68,8 @@ interface CrudPageProps {
   idKey?: string;
   moduleKey?: ModuleKey;
   allowCreate?: boolean;
+  onAddNew?: () => void;
+  addButtonLabel?: string;
   allowDelete?: boolean;
   allowExcelImport?: boolean;
   excelFileName?: string;
@@ -90,6 +92,8 @@ export function CrudPage({
   orderBy = DEFAULT_ORDER_BY,
   idKey = "id",
   allowCreate = true,
+  onAddNew,
+  addButtonLabel,
   allowDelete = true,
   allowExcelImport = true,
   excelFileName,
@@ -102,7 +106,9 @@ export function CrudPage({
   const resolvedModuleKey = moduleKey ?? TABLE_MODULE_MAP[table];
   const permissions = useModulePermissions(resolvedModuleKey);
   const lockedStakeholderId = isStakeholder ? profile?.stakeholder_id ?? null : null;
-  const canCreate = allowCreate && (permissions.unrestricted || permissions.canCreate);
+  const canCreate =
+    (allowCreate || Boolean(onAddNew)) &&
+    (permissions.unrestricted || permissions.canCreate);
   const canEdit = permissions.unrestricted || permissions.canEdit;
   const canDelete = allowDelete && (permissions.unrestricted || permissions.canDelete);
   const canImport =
@@ -729,9 +735,12 @@ export function CrudPage({
               <p className="mt-1 text-sm text-civic-600">{description}</p>
             )}
           </div>
-          <Button onClick={openCreate} disabled={!canCreate}>
+          <Button
+            onClick={onAddNew ?? openCreate}
+            disabled={!canCreate}
+          >
             <Plus className="mr-2 h-4 w-4" />
-            Add New
+            {addButtonLabel ?? "Add New"}
           </Button>
         </div>
         <ExcelToolbar
