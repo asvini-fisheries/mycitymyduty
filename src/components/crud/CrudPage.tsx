@@ -53,8 +53,16 @@ import { useModulePermissions, useAccess } from "@/contexts/AccessContext";
 import { TABLE_MODULE_MAP, type ModuleKey } from "@/lib/modules";
 import {
   STAKEHOLDER_ID_FIELD,
+  applyAllocationScopeToOptionsQuery,
+  applyAllocationScopeToRowQuery,
+  applyAllocationScopeToSelectQuery,
+  fetchAllocatedProjectIds,
   hasStakeholderIdField,
   injectLockedStakeholderId,
+  optionsTableUsesProjectAllocationScope,
+  payloadIsWithinAllocatedProjects,
+  scopeAllocationOptionsSelectQuery,
+  tableUsesProjectAllocationScope,
 } from "@/lib/stakeholders";
 
 interface CrudPageProps {
@@ -187,6 +195,10 @@ export function CrudPage({
       : await ensureLockedCorporation(supabase);
     setLockedCorporationId(lockedId);
 
+    const allocatedProjectIds = lockedStakeholderId
+      ? await fetchAllocatedProjectIds(supabase, lockedStakeholderId)
+      : null;
+
     const opts: Record<string, FieldOption[]> = {};
 
     for (const field of fields) {
@@ -198,9 +210,27 @@ export function CrudPage({
       } else if (field.optionsFrom) {
         const of = field.optionsFrom;
         const filterCfg = of.filterByFormField;
-        const scopedSelect = scopeOptionsSelectQuery(of, lockedId);
+        if (
+          allocatedProjectIds &&
+          allocatedProjectIds.length === 0 &&
+          optionsTableUsesProjectAllocationScope(of.table)
+        ) {
+          opts[field.name] = [];
+          continue;
+        }
+        const corpSelect = scopeOptionsSelectQuery(of, lockedId);
+        const scopedSelect = scopeAllocationOptionsSelectQuery(
+          of.table,
+          corpSelect,
+          allocatedProjectIds
+        );
         let query = supabase.from(of.table).select(scopedSelect);
         query = applyCorporationScopeToOptionsQuery(query, of, lockedId);
+        query = applyAllocationScopeToOptionsQuery(
+          query,
+          of.table,
+          allocatedProjectIds
+        );
 
         const { data } = await query;
         opts[field.name] = ((data as Row[] | null) || []).map((row) => ({
@@ -225,7 +255,7 @@ export function CrudPage({
       }
     }
     setFieldOptions(opts);
-  }, [fields, skipCorporationScope]);
+  }, [fields, skipCorporationScope, lockedStakeholderId]);
 
   const orderColumn = orderBy.column;
   const orderAscending = orderBy.ascending ?? false;
@@ -245,10 +275,29 @@ export function CrudPage({
       : await ensureLockedCorporation(supabase);
     setLockedCorporationId(lockedId);
 
-    const scopedSelect = applyCorporationScopeToSelectQuery(
+    const allocatedProjectIds = lockedStakeholderId
+      ? await fetchAllocatedProjectIds(supabase, lockedStakeholderId)
+      : null;
+
+    if (
+      allocatedProjectIds &&
+      allocatedProjectIds.length === 0 &&
+      tableUsesProjectAllocationScope(table)
+    ) {
+      setRows([]);
+      setLoading(false);
+      return;
+    }
+
+    const corpSelect = applyCorporationScopeToSelectQuery(
       table,
       selectQuery,
       lockedId
+    );
+    const scopedSelect = applyAllocationScopeToSelectQuery(
+      table,
+      corpSelect,
+      allocatedProjectIds
     );
 
     let query = supabase
@@ -257,6 +306,7 @@ export function CrudPage({
       .order(orderColumn, { ascending: orderAscending });
 
     query = applyCorporationScopeToRowQuery(query, table, fields, lockedId);
+    query = applyAllocationScopeToRowQuery(query, table, allocatedProjectIds);
 
     if (lockedStakeholderId && hasStakeholderIdField(fields)) {
       query = query.eq(STAKEHOLDER_ID_FIELD, lockedStakeholderId);
@@ -442,6 +492,23 @@ export function CrudPage({
 
     try {
       const supabase = createClient();
+      if (lockedStakeholderId && tableUsesProjectAllocationScope(table)) {
+        const allocatedIds = await fetchAllocatedProjectIds(
+          supabase,
+          lockedStakeholderId
+        );
+        const allowed = await payloadIsWithinAllocatedProjects(
+          supabase,
+          scopedPayload,
+          allocatedIds
+        );
+        if (!allowed) {
+          alert(
+            "You can only work with projects or requirements allocated to your stakeholder."
+          );
+          return;
+        }
+      }
       const logoFields = formFields.filter((field) => field.type === "logo");
 
       if (editing) {
@@ -644,6 +711,11 @@ export function CrudPage({
     let ok = 0;
     let failed = 0;
 
+    const allocatedIds =
+      lockedStakeholderId && tableUsesProjectAllocationScope(table)
+        ? await fetchAllocatedProjectIds(supabase, lockedStakeholderId)
+        : null;
+
     for (const { excelRowIndex, payload: row } of rowsToImport) {
       const payload = injectLockedStakeholderId(
         injectLockedCorporationId({ ...row }, fields, corpId),
@@ -651,6 +723,25 @@ export function CrudPage({
         lockedStakeholderId
       );
       const summary = summarizeImportRow(payload, formFields, fieldOptions);
+      if (allocatedIds) {
+        const allowed = await payloadIsWithinAllocatedProjects(
+          supabase,
+          payload,
+          allocatedIds
+        );
+        if (!allowed) {
+          failed++;
+          results.push({
+            excelRowIndex,
+            status: "failed",
+            payload,
+            error:
+              "Project / requirement is not allocated to your stakeholder.",
+            summary,
+          });
+          continue;
+        }
+      }
       const { error } = await supabase.from(table).insert(payload);
 
       if (error) {
@@ -812,7 +903,9 @@ export function CrudPage({
                     colSpan={columns.length + 1}
                     className="px-4 py-8 text-center text-civic-500"
                   >
-                    No records yet. Click &quot;Add New&quot; to create one.
+                    {isStakeholder && tableUsesProjectAllocationScope(table)
+                      ? "No allocated projects or requirements to show."
+                      : 'No records yet. Click "Add New" to create one.'}
                   </td>
                 </tr>
               ) : filteredRows.length === 0 ? (

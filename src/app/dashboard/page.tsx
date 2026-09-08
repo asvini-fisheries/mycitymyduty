@@ -10,6 +10,8 @@ import {
 } from "lucide-react";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
 import { ensureLockedCorporation } from "@/lib/corporations";
+import { useAccess } from "@/contexts/AccessContext";
+import { fetchAllocatedProjectIds } from "@/lib/stakeholders";
 
 interface Stats {
   projects: number;
@@ -27,6 +29,7 @@ const quickLinks = [
 ];
 
 export default function DashboardPage() {
+  const { isStakeholder, profile, loading: accessLoading } = useAccess();
   const [stats, setStats] = useState<Stats | null>(null);
   const [configured, setConfigured] = useState(true);
 
@@ -35,18 +38,29 @@ export default function DashboardPage() {
       setConfigured(false);
       return;
     }
+    if (accessLoading) return;
 
     async function loadStats() {
       const supabase = createClient();
       const lockedId = await ensureLockedCorporation(supabase);
+      const allocatedIds =
+        isStakeholder && profile?.stakeholder_id
+          ? await fetchAllocatedProjectIds(supabase, profile.stakeholder_id)
+          : null;
+
+      const projectsQuery = lockedId
+        ? supabase
+            .from("projects")
+            .select("id", { count: "exact", head: true })
+            .eq("corporation_id", lockedId)
+        : supabase.from("projects").select("id", { count: "exact", head: true });
 
       const [projects, activities, dailyUpdates, bills] = await Promise.all([
-        lockedId
-          ? supabase
-              .from("projects")
-              .select("id", { count: "exact", head: true })
-              .eq("corporation_id", lockedId)
-          : supabase.from("projects").select("id", { count: "exact", head: true }),
+        allocatedIds && allocatedIds.length === 0
+          ? Promise.resolve({ count: 0 })
+          : allocatedIds
+            ? projectsQuery.in("id", allocatedIds)
+            : projectsQuery,
         supabase.from("activities").select("id", { count: "exact", head: true }),
         supabase.from("daily_activity_updates").select("id", { count: "exact", head: true }),
         supabase.from("stakeholder_bills").select("id", { count: "exact", head: true }),
@@ -61,7 +75,7 @@ export default function DashboardPage() {
     }
 
     loadStats();
-  }, []);
+  }, [accessLoading, isStakeholder, profile?.stakeholder_id]);
 
   const statCards = stats
     ? [

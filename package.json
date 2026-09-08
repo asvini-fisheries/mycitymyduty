@@ -18,6 +18,7 @@
     "db:migrate:super-admin": "node scripts/run-migration.mjs 013_super_admin_corporation_logo.sql",
     "db:migrate:record-type": "node scripts/run-migration.mjs 015_project_record_type.sql",
     "db:migrate:allocations": "node scripts/run-migration.mjs 016_stakeholder_project_allocations.sql",
+    "db:migrate:stakeholder-members": "node scripts/run-migration.mjs 017_backfill_stakeholder_admin_members.sql",
     "db:setup-storage": "node scripts/setup-storage.mjs",
     "db:verify": "node scripts/verify-setup.mjs",
     "auth:disable-email-confirm": "node scripts/disable-email-confirm.mjs",
