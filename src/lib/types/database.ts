@@ -84,6 +84,8 @@ export interface ColumnConfig {
   key: string;
   label: string;
   render?: (row: Record<string, unknown>) => ReactNode;
+  /** Nested path whose value is appended after this cell (e.g. activity unit). */
+  suffixFrom?: string;
   /** When false, this column is not shown in the filter bar. */
   filterable?: boolean;
 }

@@ -950,16 +950,28 @@ export function CrudPage({
                     key={String(row[idKey])}
                     className="border-b border-civic-50 hover:bg-civic-50/50"
                   >
-                    {columns.map((col) => (
-                      <td key={col.key} className="px-4 py-3 text-civic-700">
-                        {col.render
-                          ? col.render(row)
-                          : formatCellValueForColumn(
-                              col.key,
-                              getNestedValue(row, col.key)
-                            )}
-                      </td>
-                    ))}
+                    {columns.map((col) => {
+                      const display = formatCellValueForColumn(
+                        col.key,
+                        getNestedValue(row, col.key)
+                      );
+                      const suffix = col.suffixFrom
+                        ? getNestedValue(row, col.suffixFrom)
+                        : null;
+                      const suffixText =
+                        suffix !== null && suffix !== undefined && suffix !== ""
+                          ? ` ${String(suffix)}`
+                          : "";
+                      return (
+                        <td key={col.key} className="px-4 py-3 text-civic-700">
+                          {col.render
+                            ? col.render(row)
+                            : display === "—"
+                              ? display
+                              : `${display}${suffixText}`}
+                        </td>
+                      );
+                    })}
                     <td className="px-4 py-3">
                       <div className="flex gap-1">
                         {printVoucher && (

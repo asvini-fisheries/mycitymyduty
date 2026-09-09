@@ -1,6 +1,5 @@
 import type { ColumnConfig, FieldConfig } from "@/lib/types/database";
 import { APP_MODULE_OPTIONS } from "@/lib/modules";
-import { getNestedValue } from "@/lib/crud-filters";
 
 const corporationOptionsFrom = {
   table: "corporations",
@@ -818,12 +817,7 @@ export const crudConfigs = {
       {
         key: "quantity",
         label: "Quantity",
-        render: (row) => {
-          const qty = row.quantity;
-          if (qty === null || qty === undefined || qty === "") return "—";
-          const unit = getNestedValue(row, "project_activities.activities.unit");
-          return unit ? `${qty} ${String(unit)}` : String(qty);
-        },
+        suffixFrom: "project_activities.activities.unit",
       },
       { key: "description", label: "Description" },
       { key: "approval_status", label: "Approval" },
