@@ -7,6 +7,7 @@ import { ensureLockedCorporation } from "@/lib/corporations";
 import { useAccess } from "@/contexts/AccessContext";
 import { fetchAllocatedProjectIds } from "@/lib/stakeholders";
 import { Select } from "@/components/ui/Select";
+import { cn } from "@/lib/utils";
 
 interface ProjectRow {
   id: string;
@@ -73,6 +74,54 @@ interface RankedStakeholder {
   quantity: number;
   participants: number;
   updateCount: number;
+}
+
+interface RankedZone {
+  id: string;
+  rank: number;
+  name: string;
+  stakeholderCount: number;
+  quantity: number;
+  participants: number;
+  updateCount: number;
+}
+
+type RankingTab = "stakeholders" | "zones";
+
+function applyRanks<T extends { rank: number; quantity: number }>(rows: T[]): T[] {
+  rows.forEach((row, index) => {
+    if (index > 0 && row.quantity === rows[index - 1].quantity) {
+      row.rank = rows[index - 1].rank;
+    } else {
+      row.rank = index + 1;
+    }
+  });
+  return rows;
+}
+
+function zoneFromStakeholder(value: unknown): { id: string; name: string } | null {
+  const stakeholder = nestedRecord(value);
+  if (!stakeholder) return null;
+  const zone = nestedRecord(stakeholder.zones);
+  if (zone?.id) {
+    return {
+      id: String(zone.id),
+      name: String(zone.name ?? "Zone"),
+    };
+  }
+  if (stakeholder.zone_id) {
+    return { id: String(stakeholder.zone_id), name: "Zone" };
+  }
+  return null;
+}
+
+function stakeholderIdFromRow(row: {
+  stakeholder_id?: string;
+  stakeholders?: unknown;
+}): string {
+  if (row.stakeholder_id) return String(row.stakeholder_id);
+  const stakeholder = nestedRecord(row.stakeholders);
+  return stakeholder?.id ? String(stakeholder.id) : "";
 }
 
 function stakeholderDetails(value: unknown): {
@@ -166,15 +215,76 @@ function rankStakeholders(
     return a.name.localeCompare(b.name);
   });
 
-  ranked.forEach((row, index) => {
-    if (index > 0 && row.quantity === ranked[index - 1].quantity) {
-      row.rank = ranked[index - 1].rank;
-    } else {
-      row.rank = index + 1;
+  return applyRanks(ranked);
+}
+
+function rankZones(
+  allocations: { stakeholder_id?: string; stakeholders?: unknown }[],
+  updates: {
+    stakeholder_id?: string;
+    quantity?: number | null;
+    persons_attended?: number | null;
+    stakeholders?: unknown;
+  }[]
+): RankedZone[] {
+  const byId = new Map<string, RankedZone>();
+  const stakeholdersByZone = new Map<string, Set<string>>();
+
+  function ensure(zone: { id: string; name: string }) {
+    if (byId.has(zone.id)) {
+      const current = byId.get(zone.id);
+      if (current && current.name === "Zone" && zone.name !== "Zone") {
+        current.name = zone.name;
+      }
+      return;
     }
+    byId.set(zone.id, {
+      id: zone.id,
+      name: zone.name,
+      rank: 0,
+      stakeholderCount: 0,
+      quantity: 0,
+      participants: 0,
+      updateCount: 0,
+    });
+    stakeholdersByZone.set(zone.id, new Set());
+  }
+
+  function addStakeholder(zone: { id: string; name: string }, stakeholderId: string) {
+    ensure(zone);
+    if (!stakeholderId) return;
+    stakeholdersByZone.get(zone.id)?.add(stakeholderId);
+  }
+
+  for (const row of allocations) {
+    const zone = zoneFromStakeholder(row.stakeholders);
+    if (!zone) continue;
+    addStakeholder(zone, stakeholderIdFromRow(row));
+  }
+
+  for (const row of updates) {
+    const zone = zoneFromStakeholder(row.stakeholders);
+    if (!zone) continue;
+    addStakeholder(zone, stakeholderIdFromRow(row));
+    const current = byId.get(zone.id);
+    if (!current) continue;
+    current.quantity += Number(row.quantity || 0);
+    current.participants += Number(row.persons_attended || 0);
+    current.updateCount += 1;
+  }
+
+  const ranked = [...byId.values()].map((row) => ({
+    ...row,
+    stakeholderCount: stakeholdersByZone.get(row.id)?.size ?? row.stakeholderCount,
+  }));
+
+  ranked.sort((a, b) => {
+    if (b.quantity !== a.quantity) return b.quantity - a.quantity;
+    if (b.participants !== a.participants) return b.participants - a.participants;
+    return a.name.localeCompare(b.name);
   });
 
-  return ranked;
+  return applyRanks(ranked);
 }
 
 interface ProjectStats {
@@ -192,6 +302,8 @@ export default function ProjectDashboardPage() {
   const [rankedStakeholders, setRankedStakeholders] = useState<
     RankedStakeholder[]
   >([]);
+  const [rankedZones, setRankedZones] = useState<RankedZone[]>([]);
+  const [rankingTab, setRankingTab] = useState<RankingTab>("stakeholders");
   const [loading, setLoading] = useState(true);
   const [emptyMessage, setEmptyMessage] = useState<string | null>(null);
 
@@ -251,6 +363,7 @@ export default function ProjectDashboardPage() {
     async function loadProjectStats() {
       setStats(null);
       setRankedStakeholders([]);
+      setRankedZones([]);
       const supabase = createClient();
 
       const { data: projectActivities } = await supabase
@@ -265,14 +378,14 @@ export default function ProjectDashboardPage() {
           ? supabase
               .from("daily_activity_updates")
               .select(
-                "quantity, persons_attended, stakeholder_id, stakeholders(id, name, contact_person, phone, stakeholder_categories(name))"
+                "quantity, persons_attended, stakeholder_id, stakeholders(id, name, contact_person, phone, zone_id, stakeholder_categories(name), zones(id, name))"
               )
               .in("project_activity_id", paIds)
           : Promise.resolve({ data: [] }),
         supabase
           .from("stakeholder_project_allocations")
           .select(
-            "stakeholder_id, stakeholders(id, name, contact_person, phone, stakeholder_categories(name))"
+            "stakeholder_id, stakeholders(id, name, contact_person, phone, zone_id, stakeholder_categories(name), zones(id, name))"
           )
           .eq("project_id", selectedProjectId),
       ]);
@@ -280,8 +393,10 @@ export default function ProjectDashboardPage() {
       const updateRows = updates.data || [];
       const allocationRows = allocations.data || [];
       const ranked = rankStakeholders(allocationRows, updateRows);
+      const zones = rankZones(allocationRows, updateRows);
 
       setRankedStakeholders(ranked);
+      setRankedZones(zones);
       setStats({
         updateCount: updateRows.length,
         allocatedStakeholders: allocationRows.length,
@@ -373,30 +488,125 @@ export default function ProjectDashboardPage() {
       )}
 
       <div className="overflow-hidden rounded-xl border border-civic-100 bg-white shadow-sm">
-        <div className="flex items-center justify-between border-b border-civic-100 px-5 py-4">
-          <h2 className="text-lg font-semibold text-civic-900">Top Performers</h2>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-civic-100 px-5">
+          <div className="flex gap-1" role="tablist" aria-label="Rankings">
+            {(
+              [
+                { id: "stakeholders", label: "Top Performers" },
+                { id: "zones", label: "Top Zones" },
+              ] as const
+            ).map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                role="tab"
+                aria-selected={rankingTab === tab.id}
+                className={cn(
+                  "-mb-px border-b-2 px-3 py-4 text-sm font-semibold",
+                  rankingTab === tab.id
+                    ? "border-civic-800 text-civic-900"
+                    : "border-transparent text-civic-500 hover:text-civic-800"
+                )}
+                onClick={() => setRankingTab(tab.id)}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
           <Link
-            href="/dashboard/masters/stakeholder-allocations"
-            className="text-sm font-medium text-civic-700 hover:underline"
+            href={
+              rankingTab === "zones"
+                ? "/dashboard/masters/zones"
+                : "/dashboard/masters/stakeholder-allocations"
+            }
+            className="py-4 text-sm font-medium text-civic-700 hover:underline"
           >
-            View allocations
+            {rankingTab === "zones" ? "View zones" : "View allocations"}
           </Link>
         </div>
-        {rankedStakeholders.length === 0 ? (
+        {rankingTab === "stakeholders" ? (
+          rankedStakeholders.length === 0 ? (
+            <p className="px-5 py-8 text-sm text-civic-500">
+              No stakeholders are allocated to this project yet.
+            </p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[720px] text-left text-sm">
+                <thead className="border-b border-civic-100 bg-civic-50">
+                  <tr>
+                    <th className="px-5 py-3 font-semibold text-civic-800">Rank</th>
+                    <th className="px-5 py-3 font-semibold text-civic-800">
+                      Stakeholder
+                    </th>
+                    <th className="px-5 py-3 font-semibold text-civic-800">
+                      Contact
+                    </th>
+                    <th className="px-5 py-3 text-right font-semibold text-civic-800">
+                      Quantity
+                    </th>
+                    <th className="px-5 py-3 text-right font-semibold text-civic-800">
+                      Participants
+                    </th>
+                    <th className="px-5 py-3 text-right font-semibold text-civic-800">
+                      Updates
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rankedStakeholders.map((row) => (
+                    <tr
+                      key={row.id}
+                      className="border-b border-civic-50 last:border-0"
+                    >
+                      <td className="px-5 py-3 font-semibold text-civic-900">
+                        {row.rank}
+                      </td>
+                      <td className="px-5 py-3">
+                        <p className="font-medium text-civic-900">{row.name}</p>
+                        {row.category ? (
+                          <p className="text-xs text-civic-500">{row.category}</p>
+                        ) : null}
+                      </td>
+                      <td className="px-5 py-3 text-civic-700">
+                        {row.contactPerson || row.phone ? (
+                          <>
+                            {row.contactPerson ? <p>{row.contactPerson}</p> : null}
+                            {row.phone ? (
+                              <p className="text-xs text-civic-500">{row.phone}</p>
+                            ) : null}
+                          </>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
+                      <td className="px-5 py-3 text-right font-medium text-civic-900">
+                        {formatQuantity(row.quantity)}
+                      </td>
+                      <td className="px-5 py-3 text-right text-civic-700">
+                        {row.participants.toLocaleString("en-IN")}
+                      </td>
+                      <td className="px-5 py-3 text-right text-civic-700">
+                        {row.updateCount.toLocaleString("en-IN")}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )
+        ) : rankedZones.length === 0 ? (
           <p className="px-5 py-8 text-sm text-civic-500">
-            No stakeholders are allocated to this project yet.
+            No zone ranking yet. Assign a zone to stakeholders to see this list.
           </p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[720px] text-left text-sm">
+            <table className="w-full min-w-[640px] text-left text-sm">
               <thead className="border-b border-civic-100 bg-civic-50">
                 <tr>
                   <th className="px-5 py-3 font-semibold text-civic-800">Rank</th>
-                  <th className="px-5 py-3 font-semibold text-civic-800">
-                    Stakeholder
-                  </th>
-                  <th className="px-5 py-3 font-semibold text-civic-800">
-                    Contact
+                  <th className="px-5 py-3 font-semibold text-civic-800">Zone</th>
+                  <th className="px-5 py-3 text-right font-semibold text-civic-800">
+                    Stakeholders
                   </th>
                   <th className="px-5 py-3 text-right font-semibold text-civic-800">
                     Quantity
@@ -410,7 +620,7 @@ export default function ProjectDashboardPage() {
                 </tr>
               </thead>
               <tbody>
-                {rankedStakeholders.map((row) => (
+                {rankedZones.map((row) => (
                   <tr
                     key={row.id}
                     className="border-b border-civic-50 last:border-0"
@@ -418,23 +628,11 @@ export default function ProjectDashboardPage() {
                     <td className="px-5 py-3 font-semibold text-civic-900">
                       {row.rank}
                     </td>
-                    <td className="px-5 py-3">
-                      <p className="font-medium text-civic-900">{row.name}</p>
-                      {row.category ? (
-                        <p className="text-xs text-civic-500">{row.category}</p>
-                      ) : null}
+                    <td className="px-5 py-3 font-medium text-civic-900">
+                      {row.name}
                     </td>
-                    <td className="px-5 py-3 text-civic-700">
-                      {row.contactPerson || row.phone ? (
-                        <>
-                          {row.contactPerson ? <p>{row.contactPerson}</p> : null}
-                          {row.phone ? (
-                            <p className="text-xs text-civic-500">{row.phone}</p>
-                          ) : null}
-                        </>
-                      ) : (
-                        "—"
-                      )}
+                    <td className="px-5 py-3 text-right text-civic-700">
+                      {row.stakeholderCount.toLocaleString("en-IN")}
                     </td>
                     <td className="px-5 py-3 text-right font-medium text-civic-900">
                       {formatQuantity(row.quantity)}

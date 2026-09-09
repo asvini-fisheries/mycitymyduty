@@ -139,6 +139,7 @@ export interface Stakeholder {
   id: string;
   stakeholder_category_id: string;
   corporation_id: string | null;
+  zone_id: string | null;
   registration_no: string | null;
   gstin: string | null;
   pan: string | null;

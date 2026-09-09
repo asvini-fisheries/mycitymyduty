@@ -498,10 +498,11 @@ export const crudConfigs = {
     title: "Stakeholders",
     description: "Organizations and service providers",
     table: "stakeholders",
-    selectQuery: "*, stakeholder_categories(name), corporations(name), service_categories(name)",
+    selectQuery: "*, stakeholder_categories(name), corporations(name), zones(name), service_categories(name)",
     columns: [
       { key: "name", label: "Name" },
       { key: "stakeholder_categories.name", label: "Category" },
+      { key: "zones.name", label: "Zone" },
       { key: "gstin", label: "GSTIN" },
       { key: "service_categories.name", label: "Service" },
       { key: "phone", label: "Phone" },
@@ -509,7 +510,22 @@ export const crudConfigs = {
     ] as ColumnConfig[],
     fields: [
       { name: "stakeholder_category_id", label: "Category", type: "select", required: true, optionsFrom: stakeholderCategoryOptionsFrom },
-      { name: "corporation_id", label: "Corporation", type: "select", optionsFrom: corporationOptionsFrom },
+      { name: "corporation_id", label: "Corporation", type: "select", optionsFrom: corporationOptionsFrom, clearsOnChange: ["zone_id"] },
+      {
+        name: "zone_id",
+        label: "Zone",
+        type: "select",
+        optionsFrom: {
+          table: "zones",
+          valueKey: "id",
+          labelKey: "name",
+          selectQuery: "id, name, corporation_id",
+          filterByFormField: {
+            formField: "corporation_id",
+            rowKey: "corporation_id",
+          },
+        },
+      },
       { name: "service_category_id", label: "Service Category", type: "select", optionsFrom: serviceCategoryOptionsFrom },
       { name: "registration_no", label: "Registration No.", type: "text" },
       { name: "gstin", label: "GSTIN", type: "text", placeholder: "15-character GSTIN (optional)" },
