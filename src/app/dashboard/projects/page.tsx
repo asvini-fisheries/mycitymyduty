@@ -146,7 +146,6 @@ function stakeholderDetails(value: unknown): {
 }
 
 function rankStakeholders(
-  allocations: { stakeholder_id?: string; stakeholders?: unknown }[],
   updates: {
     stakeholder_id?: string;
     quantity?: number | null;
@@ -165,21 +164,6 @@ function rankStakeholders(
       participants: 0,
       updateCount: 0,
     });
-  }
-
-  for (const row of allocations) {
-    ensure(
-      stakeholderDetails(row.stakeholders) ??
-        (row.stakeholder_id
-          ? {
-              id: String(row.stakeholder_id),
-              name: "Stakeholder",
-              category: null,
-              contactPerson: null,
-              phone: null,
-            }
-          : null)
-    );
   }
 
   for (const row of updates) {
@@ -392,7 +376,7 @@ export default function ProjectDashboardPage() {
 
       const updateRows = updates.data || [];
       const allocationRows = allocations.data || [];
-      const ranked = rankStakeholders(allocationRows, updateRows);
+      const ranked = rankStakeholders(updateRows);
       const zones = rankZones(allocationRows, updateRows);
 
       setRankedStakeholders(ranked);
@@ -527,7 +511,7 @@ export default function ProjectDashboardPage() {
         {rankingTab === "stakeholders" ? (
           rankedStakeholders.length === 0 ? (
             <p className="px-5 py-8 text-sm text-civic-500">
-              No stakeholders are allocated to this project yet.
+              No stakeholders have entered daily activities for this project yet.
             </p>
           ) : (
             <div className="overflow-x-auto">
