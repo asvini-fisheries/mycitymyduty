@@ -14,29 +14,9 @@ interface ProjectRow {
   code: string | null;
   record_type: string | null;
   status: string;
-  budget: number;
   quantity: number | null;
   start_date: string | null;
   created_at: string | null;
-  activity_description: string | null;
-  corporations?: { name: string };
-  zone_wards?: { ward_number: string; name: string } | null;
-  ward_areas?: { name: string } | null;
-  area_streets?: { name: string } | null;
-}
-
-function formatProjectLocation(project: ProjectRow): string | null {
-  const parts: string[] = [];
-  if (project.zone_wards) {
-    parts.push(`Ward ${project.zone_wards.ward_number} — ${project.zone_wards.name}`);
-  }
-  if (project.ward_areas?.name) {
-    parts.push(project.ward_areas.name);
-  }
-  if (project.area_streets?.name) {
-    parts.push(project.area_streets.name);
-  }
-  return parts.length > 0 ? parts.join(" · ") : null;
 }
 
 function formatRecordType(value: string | null | undefined): string {
@@ -228,7 +208,7 @@ export default function ProjectDashboardPage() {
       let query = supabase
         .from("projects")
         .select(
-          "id, name, code, record_type, status, budget, quantity, start_date, created_at, activity_description, corporations(name), zone_wards(ward_number, name), ward_areas(name), area_streets(name)"
+          "id, name, code, record_type, status, quantity, start_date, created_at"
         )
         .order("name");
 
@@ -320,7 +300,6 @@ export default function ProjectDashboardPage() {
   }, [selectedProjectId]);
 
   const selectedProject = projects.find((p) => p.id === selectedProjectId);
-  const selectedLocation = selectedProject ? formatProjectLocation(selectedProject) : null;
 
   if (loading) {
     return <p className="text-civic-600">Loading projects...</p>;
@@ -340,18 +319,11 @@ export default function ProjectDashboardPage() {
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-civic-900">Project Dashboard</h1>
-          <p className="mt-1 text-civic-600">
-            {isStakeholder
-              ? "Allocated projects and requirements assigned to you"
-              : "Progress and quantity overview by project"}
-          </p>
-        </div>
-        <div className="w-full sm:w-96">
+      <div className="space-y-4">
+        <h1 className="text-2xl font-bold text-civic-900">Project Dashboard</h1>
+        <div className="w-full max-w-xl">
           <Select
-            label="Select Project / Requirement"
+            aria-label="Select project"
             options={projects.map((p) => ({
               value: p.id,
               label: [
@@ -368,50 +340,26 @@ export default function ProjectDashboardPage() {
         </div>
       </div>
 
-      {selectedProject && (
-        <div className="rounded-xl border border-civic-100 bg-white p-6 shadow-sm">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-civic-500">
-                {formatRecordType(selectedProject.record_type)}
-              </p>
-              <h2 className="text-xl font-semibold text-civic-900">{selectedProject.name}</h2>
-              <p className="text-sm text-civic-600">
-                {selectedProject.corporations?.name}
-                {selectedLocation ? ` · ${selectedLocation}` : ""} · Status:{" "}
-                <span className="capitalize">{selectedProject.status.replace("_", " ")}</span>
-                {selectedProject.activity_description
-                  ? ` · ${selectedProject.activity_description}`
-                  : ""}
-              </p>
-            </div>
-            <p className="text-lg font-semibold text-civic-800">
-              Budget: ₹{Number(selectedProject.budget || 0).toLocaleString("en-IN")}
-            </p>
-          </div>
-        </div>
-      )}
-
       {stats && (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
           {[
-            {
-              label: "Stakeholders allocated",
-              value: stats.allocatedStakeholders.toLocaleString("en-IN"),
-            },
             {
               label: "Project quantity",
               value: formatQuantity(selectedProject?.quantity),
             },
             {
-              label: "Quantity so far",
+              label: "So far done",
               value: formatQuantity(stats.dailyQuantity),
             },
             {
               label: "Participants",
               value: stats.participants.toLocaleString("en-IN"),
             },
-            { label: "Daily Updates", value: stats.updateCount },
+            {
+              label: "Stakeholder allocated",
+              value: stats.allocatedStakeholders.toLocaleString("en-IN"),
+            },
+            { label: "Daily activities", value: stats.updateCount },
           ].map((card) => (
             <div
               key={card.label}
@@ -426,14 +374,7 @@ export default function ProjectDashboardPage() {
 
       <div className="overflow-hidden rounded-xl border border-civic-100 bg-white shadow-sm">
         <div className="flex items-center justify-between border-b border-civic-100 px-5 py-4">
-          <div>
-            <h2 className="text-lg font-semibold text-civic-900">
-              Stakeholders by quantity
-            </h2>
-            <p className="mt-0.5 text-sm text-civic-600">
-              Ranked by quantity entered in daily activities for this project
-            </p>
-          </div>
+          <h2 className="text-lg font-semibold text-civic-900">Top Performers</h2>
           <Link
             href="/dashboard/masters/stakeholder-allocations"
             className="text-sm font-medium text-civic-700 hover:underline"
