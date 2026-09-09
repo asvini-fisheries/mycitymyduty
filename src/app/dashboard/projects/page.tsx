@@ -15,6 +15,10 @@ interface ProjectRow {
   record_type: string | null;
   status: string;
   budget: number;
+  quantity: number | null;
+  start_date: string | null;
+  created_at: string | null;
+  activity_description: string | null;
   corporations?: { name: string };
   zone_wards?: { ward_number: string; name: string } | null;
   ward_areas?: { name: string } | null;
@@ -41,10 +45,42 @@ function formatRecordType(value: string | null | undefined): string {
   return value ?? "—";
 }
 
+function latestTimestamp(project: ProjectRow): string {
+  return project.start_date || project.created_at || "";
+}
+
+function sortProjectsFirst(rows: ProjectRow[]): ProjectRow[] {
+  return [...rows].sort((a, b) => {
+    const typeA = a.record_type === "project" ? 0 : 1;
+    const typeB = b.record_type === "project" ? 0 : 1;
+    if (typeA !== typeB) return typeA - typeB;
+    const time = latestTimestamp(b).localeCompare(latestTimestamp(a));
+    if (time !== 0) return time;
+    return a.name.localeCompare(b.name);
+  });
+}
+
+function pickDefaultProjectId(rows: ProjectRow[]): string {
+  if (!rows.length) return "";
+  const projectsOnly = rows.filter((row) => row.record_type === "project");
+  const pool = projectsOnly.length ? projectsOnly : rows;
+  const active = pool.filter((row) => row.status === "active");
+  const planned = pool.filter((row) => row.status === "planned");
+  const candidates = active.length ? active : planned.length ? planned : pool;
+  return sortProjectsFirst(candidates)[0]?.id ?? rows[0].id;
+}
+
+function formatQuantity(value: number | null | undefined): string {
+  if (value === null || value === undefined) return "—";
+  return Number(value).toLocaleString("en-IN");
+}
+
 interface ProjectStats {
   activityCount: number;
   updateCount: number;
-  avgProgress: number;
+  allocatedStakeholders: number;
+  dailyQuantity: number;
+  participants: number;
   totalFunding: number;
   totalBilled: number;
   totalPaid: number;
@@ -71,7 +107,7 @@ export default function ProjectDashboardPage() {
       let query = supabase
         .from("projects")
         .select(
-          "id, name, code, record_type, status, budget, corporations(name), zone_wards(ward_number, name), ward_areas(name), area_streets(name)"
+          "id, name, code, record_type, status, budget, quantity, start_date, created_at, activity_description, corporations(name), zone_wards(ward_number, name), ward_areas(name), area_streets(name)"
         )
         .order("name");
 
@@ -96,11 +132,11 @@ export default function ProjectDashboardPage() {
       }
 
       const { data } = await query;
-      const rows = (data as unknown as ProjectRow[]) || [];
+      const rows = sortProjectsFirst((data as unknown as ProjectRow[]) || []);
       setProjects(rows);
       setEmptyMessage(rows.length ? null : "No projects found.");
       if (rows.length) {
-        setSelectedProjectId(rows[0].id);
+        setSelectedProjectId(pickDefaultProjectId(rows));
       }
       setLoading(false);
     }
@@ -122,16 +158,12 @@ export default function ProjectDashboardPage() {
       const paIds = (projectActivities || []).map((pa) => pa.id);
       const stakeholderId = isStakeholder ? profile?.stakeholder_id : null;
 
-      const [updates, funding, bills, payments] = await Promise.all([
+      const [updates, funding, bills, payments, allocations] = await Promise.all([
         paIds.length
-          ? (() => {
-              let q = supabase
-                .from("daily_activity_updates")
-                .select("progress_pct")
-                .in("project_activity_id", paIds);
-              if (stakeholderId) q = q.eq("stakeholder_id", stakeholderId);
-              return q;
-            })()
+          ? supabase
+              .from("daily_activity_updates")
+              .select("quantity, persons_attended")
+              .in("project_activity_id", paIds)
           : Promise.resolve({ data: [] }),
         paIds.length
           ? (() => {
@@ -153,20 +185,26 @@ export default function ProjectDashboardPage() {
           if (stakeholderId) q = q.eq("stakeholder_id", stakeholderId);
           return q;
         })(),
+        supabase
+          .from("stakeholder_project_allocations")
+          .select("id", { count: "exact", head: true })
+          .eq("project_id", selectedProjectId),
       ]);
 
       const updateRows = updates.data || [];
-      const avgProgress =
-        updateRows.length > 0
-          ? Math.round(
-              updateRows.reduce((s, r) => s + (r.progress_pct || 0), 0) / updateRows.length
-            )
-          : 0;
 
       setStats({
         activityCount: paIds.length,
         updateCount: updateRows.length,
-        avgProgress,
+        allocatedStakeholders: allocations.count || 0,
+        dailyQuantity: updateRows.reduce(
+          (sum, row) => sum + Number(row.quantity || 0),
+          0
+        ),
+        participants: updateRows.reduce(
+          (sum, row) => sum + Number(row.persons_attended || 0),
+          0
+        ),
         totalFunding: (funding.data || []).reduce(
           (s, r) => s + Number(r.committed_amount || 0),
           0
@@ -209,7 +247,7 @@ export default function ProjectDashboardPage() {
               : "Progress, funding, and billing overview by project"}
           </p>
         </div>
-        <div className="w-full sm:w-72">
+        <div className="w-full sm:w-96">
           <Select
             label="Select Project / Requirement"
             options={projects.map((p) => ({
@@ -240,6 +278,9 @@ export default function ProjectDashboardPage() {
                 {selectedProject.corporations?.name}
                 {selectedLocation ? ` · ${selectedLocation}` : ""} · Status:{" "}
                 <span className="capitalize">{selectedProject.status.replace("_", " ")}</span>
+                {selectedProject.activity_description
+                  ? ` · ${selectedProject.activity_description}`
+                  : ""}
               </p>
             </div>
             <p className="text-lg font-semibold text-civic-800">
@@ -250,11 +291,26 @@ export default function ProjectDashboardPage() {
       )}
 
       {stats && (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {[
+            {
+              label: "Stakeholders allocated",
+              value: stats.allocatedStakeholders.toLocaleString("en-IN"),
+            },
+            {
+              label: "Project quantity",
+              value: formatQuantity(selectedProject?.quantity),
+            },
+            {
+              label: "Quantity so far",
+              value: formatQuantity(stats.dailyQuantity),
+            },
+            {
+              label: "Participants",
+              value: stats.participants.toLocaleString("en-IN"),
+            },
             { label: "Project Activities", value: stats.activityCount },
             { label: "Daily Updates", value: stats.updateCount },
-            { label: "Avg. Progress", value: `${stats.avgProgress}%` },
             {
               label: "Total Funding",
               value: `₹${stats.totalFunding.toLocaleString("en-IN")}`,
@@ -283,8 +339,8 @@ export default function ProjectDashboardPage() {
         <p className="font-medium">Manage this project</p>
         <ul className="mt-2 list-inside list-disc space-y-1">
           <li>
-            <Link href="/dashboard/masters/project-activities" className="text-civic-800 underline">
-              Project Activities
+            <Link href="/dashboard/masters/stakeholder-allocations" className="text-civic-800 underline">
+              Project Allocations
             </Link>
           </li>
           <li>

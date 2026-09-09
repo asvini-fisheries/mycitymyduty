@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Search } from "lucide-react";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
 import { ensureLockedCorporation } from "@/lib/corporations";
 import { Button } from "@/components/ui/Button";
@@ -49,6 +50,10 @@ export function AllocationBulkModal({
   const [selectedStakeholderIds, setSelectedStakeholderIds] = useState<string[]>(
     []
   );
+  const [allocatedStakeholderIds, setAllocatedStakeholderIds] = useState<
+    string[]
+  >([]);
+  const [stakeholderSearch, setStakeholderSearch] = useState("");
   const [notes, setNotes] = useState("");
 
   const loadOptions = useCallback(async () => {
@@ -97,10 +102,42 @@ export function AllocationBulkModal({
       setCategoryId("");
       setProjectId("");
       setSelectedStakeholderIds([]);
+      setAllocatedStakeholderIds([]);
+      setStakeholderSearch("");
       setNotes("");
       setError(null);
     }
   }, [open, loadOptions]);
+
+  useEffect(() => {
+    if (!open || !projectId || !isSupabaseConfigured()) {
+      setAllocatedStakeholderIds([]);
+      return;
+    }
+
+    let cancelled = false;
+    const supabase = createClient();
+    supabase
+      .from("stakeholder_project_allocations")
+      .select("stakeholder_id")
+      .eq("project_id", projectId)
+      .then(({ data, error: allocError }) => {
+        if (cancelled) return;
+        if (allocError) {
+          setAllocatedStakeholderIds([]);
+          return;
+        }
+        const ids = (data ?? []).map((row) => String(row.stakeholder_id));
+        setAllocatedStakeholderIds(ids);
+        setSelectedStakeholderIds((prev) =>
+          prev.filter((id) => !ids.includes(id))
+        );
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, projectId]);
 
   const filteredProjects = useMemo(
     () => projects.filter((p) => p.record_type === recordType),
@@ -108,9 +145,21 @@ export function AllocationBulkModal({
   );
 
   const filteredStakeholders = useMemo(() => {
-    if (!categoryId) return stakeholders;
-    return stakeholders.filter((s) => s.stakeholder_category_id === categoryId);
-  }, [stakeholders, categoryId]);
+    const allocated = new Set(allocatedStakeholderIds);
+    const query = stakeholderSearch.trim().toLowerCase();
+    return stakeholders.filter((s) => {
+      if (categoryId && s.stakeholder_category_id !== categoryId) return false;
+      if (projectId && allocated.has(s.id)) return false;
+      if (query && !s.name.toLowerCase().includes(query)) return false;
+      return true;
+    });
+  }, [
+    stakeholders,
+    categoryId,
+    projectId,
+    allocatedStakeholderIds,
+    stakeholderSearch,
+  ]);
 
   const projectOptions = filteredProjects.map((p) => ({
     value: p.id,
@@ -129,6 +178,7 @@ export function AllocationBulkModal({
   }
 
   function selectAllStakeholders() {
+    if (!projectId) return;
     setSelectedStakeholderIds(filteredStakeholders.map((s) => s.id));
   }
 
@@ -197,7 +247,11 @@ export function AllocationBulkModal({
             required
             options={projectOptions}
             value={projectId}
-            onChange={(e) => setProjectId(e.target.value)}
+            onChange={(e) => {
+              setProjectId(e.target.value);
+              setSelectedStakeholderIds([]);
+              setStakeholderSearch("");
+            }}
           />
 
           <Select
@@ -208,6 +262,7 @@ export function AllocationBulkModal({
             onChange={(e) => {
               setCategoryId(e.target.value);
               setSelectedStakeholderIds([]);
+              setStakeholderSearch("");
             }}
           />
 
@@ -219,8 +274,9 @@ export function AllocationBulkModal({
               <div className="flex gap-2">
                 <button
                   type="button"
-                  className="text-xs font-medium text-civic-700 hover:underline"
+                  className="text-xs font-medium text-civic-700 hover:underline disabled:cursor-not-allowed disabled:no-underline disabled:opacity-50"
                   onClick={selectAllStakeholders}
+                  disabled={!projectId}
                 >
                   Select all
                 </button>
@@ -233,10 +289,27 @@ export function AllocationBulkModal({
                 </button>
               </div>
             </div>
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-civic-400" />
+              <input
+                type="search"
+                value={stakeholderSearch}
+                onChange={(e) => setStakeholderSearch(e.target.value)}
+                placeholder="Search stakeholders..."
+                className="w-full rounded-lg border border-civic-200 py-2 pl-8 pr-3 text-sm text-civic-900 placeholder:text-civic-400 focus:border-civic-500 focus:outline-none focus:ring-2 focus:ring-civic-200"
+                aria-label="Search stakeholders"
+              />
+            </div>
             <div className="max-h-52 space-y-1 overflow-y-auto rounded-lg border border-civic-200 p-2">
-              {filteredStakeholders.length === 0 ? (
+              {!projectId ? (
                 <p className="px-2 py-3 text-sm text-civic-500">
-                  No stakeholders found for this category.
+                  Select a project or requirement to see available stakeholders.
+                </p>
+              ) : filteredStakeholders.length === 0 ? (
+                <p className="px-2 py-3 text-sm text-civic-500">
+                  {stakeholderSearch.trim()
+                    ? "No stakeholders match this search."
+                    : "All matching stakeholders are already allocated to this project."}
                 </p>
               ) : (
                 filteredStakeholders.map((stakeholder) => (

@@ -164,6 +164,8 @@ export interface Project extends GeoCoordinates, ApprovalWorkflow {
   code: string | null;
   name: string;
   description: string | null;
+  quantity: number | null;
+  activity_description: string | null;
   start_date: string | null;
   end_date: string | null;
   budget: number;
