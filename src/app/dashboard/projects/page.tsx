@@ -75,15 +75,133 @@ function formatQuantity(value: number | null | undefined): string {
   return Number(value).toLocaleString("en-IN");
 }
 
+function nestedRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object") return null;
+  if (Array.isArray(value)) {
+    return (value[0] as Record<string, unknown> | undefined) ?? null;
+  }
+  return value as Record<string, unknown>;
+}
+
+interface RankedStakeholder {
+  id: string;
+  rank: number;
+  name: string;
+  category: string | null;
+  contactPerson: string | null;
+  phone: string | null;
+  quantity: number;
+  participants: number;
+  updateCount: number;
+}
+
+function stakeholderDetails(value: unknown): {
+  id: string;
+  name: string;
+  category: string | null;
+  contactPerson: string | null;
+  phone: string | null;
+} | null {
+  const stakeholder = nestedRecord(value);
+  if (!stakeholder?.id) return null;
+  const category = nestedRecord(stakeholder.stakeholder_categories);
+  return {
+    id: String(stakeholder.id),
+    name: String(stakeholder.name ?? "Stakeholder"),
+    category: category?.name ? String(category.name) : null,
+    contactPerson: stakeholder.contact_person
+      ? String(stakeholder.contact_person)
+      : null,
+    phone: stakeholder.phone ? String(stakeholder.phone) : null,
+  };
+}
+
+function rankStakeholders(
+  allocations: { stakeholder_id?: string; stakeholders?: unknown }[],
+  updates: {
+    stakeholder_id?: string;
+    quantity?: number | null;
+    persons_attended?: number | null;
+    stakeholders?: unknown;
+  }[]
+): RankedStakeholder[] {
+  const byId = new Map<string, RankedStakeholder>();
+
+  function ensure(details: ReturnType<typeof stakeholderDetails>) {
+    if (!details || byId.has(details.id)) return;
+    byId.set(details.id, {
+      ...details,
+      rank: 0,
+      quantity: 0,
+      participants: 0,
+      updateCount: 0,
+    });
+  }
+
+  for (const row of allocations) {
+    ensure(
+      stakeholderDetails(row.stakeholders) ??
+        (row.stakeholder_id
+          ? {
+              id: String(row.stakeholder_id),
+              name: "Stakeholder",
+              category: null,
+              contactPerson: null,
+              phone: null,
+            }
+          : null)
+    );
+  }
+
+  for (const row of updates) {
+    const details =
+      stakeholderDetails(row.stakeholders) ??
+      (row.stakeholder_id
+        ? {
+            id: String(row.stakeholder_id),
+            name: "Stakeholder",
+            category: null,
+            contactPerson: null,
+            phone: null,
+          }
+        : null);
+    if (!details) continue;
+    ensure(details);
+    const current = byId.get(details.id);
+    if (!current) continue;
+    if (current.name === "Stakeholder" && details.name !== "Stakeholder") {
+      current.name = details.name;
+      current.category = details.category;
+      current.contactPerson = details.contactPerson;
+      current.phone = details.phone;
+    }
+    current.quantity += Number(row.quantity || 0);
+    current.participants += Number(row.persons_attended || 0);
+    current.updateCount += 1;
+  }
+
+  const ranked = [...byId.values()].sort((a, b) => {
+    if (b.quantity !== a.quantity) return b.quantity - a.quantity;
+    if (b.participants !== a.participants) return b.participants - a.participants;
+    return a.name.localeCompare(b.name);
+  });
+
+  ranked.forEach((row, index) => {
+    if (index > 0 && row.quantity === ranked[index - 1].quantity) {
+      row.rank = ranked[index - 1].rank;
+    } else {
+      row.rank = index + 1;
+    }
+  });
+
+  return ranked;
+}
+
 interface ProjectStats {
-  activityCount: number;
   updateCount: number;
   allocatedStakeholders: number;
   dailyQuantity: number;
   participants: number;
-  totalFunding: number;
-  totalBilled: number;
-  totalPaid: number;
 }
 
 export default function ProjectDashboardPage() {
@@ -91,6 +209,9 @@ export default function ProjectDashboardPage() {
   const [projects, setProjects] = useState<ProjectRow[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [stats, setStats] = useState<ProjectStats | null>(null);
+  const [rankedStakeholders, setRankedStakeholders] = useState<
+    RankedStakeholder[]
+  >([]);
   const [loading, setLoading] = useState(true);
   const [emptyMessage, setEmptyMessage] = useState<string | null>(null);
 
@@ -148,6 +269,8 @@ export default function ProjectDashboardPage() {
     if (!selectedProjectId || !isSupabaseConfigured()) return;
 
     async function loadProjectStats() {
+      setStats(null);
+      setRankedStakeholders([]);
       const supabase = createClient();
 
       const { data: projectActivities } = await supabase
@@ -156,47 +279,32 @@ export default function ProjectDashboardPage() {
         .eq("project_id", selectedProjectId);
 
       const paIds = (projectActivities || []).map((pa) => pa.id);
-      const stakeholderId = isStakeholder ? profile?.stakeholder_id : null;
 
-      const [updates, funding, bills, payments, allocations] = await Promise.all([
+      const [updates, allocations] = await Promise.all([
         paIds.length
           ? supabase
               .from("daily_activity_updates")
-              .select("quantity, persons_attended")
+              .select(
+                "quantity, persons_attended, stakeholder_id, stakeholders(id, name, contact_person, phone, stakeholder_categories(name))"
+              )
               .in("project_activity_id", paIds)
           : Promise.resolve({ data: [] }),
-        paIds.length
-          ? (() => {
-              let q = supabase
-                .from("activity_funding_stakeholders")
-                .select("committed_amount")
-                .in("project_activity_id", paIds);
-              if (stakeholderId) q = q.eq("stakeholder_id", stakeholderId);
-              return q;
-            })()
-          : Promise.resolve({ data: [] }),
-        (() => {
-          let q = supabase.from("stakeholder_bills").select("amount, stakeholder_id");
-          if (stakeholderId) q = q.eq("stakeholder_id", stakeholderId);
-          return q;
-        })(),
-        (() => {
-          let q = supabase.from("stakeholder_payments").select("amount");
-          if (stakeholderId) q = q.eq("stakeholder_id", stakeholderId);
-          return q;
-        })(),
         supabase
           .from("stakeholder_project_allocations")
-          .select("id", { count: "exact", head: true })
+          .select(
+            "stakeholder_id, stakeholders(id, name, contact_person, phone, stakeholder_categories(name))"
+          )
           .eq("project_id", selectedProjectId),
       ]);
 
       const updateRows = updates.data || [];
+      const allocationRows = allocations.data || [];
+      const ranked = rankStakeholders(allocationRows, updateRows);
 
+      setRankedStakeholders(ranked);
       setStats({
-        activityCount: paIds.length,
         updateCount: updateRows.length,
-        allocatedStakeholders: allocations.count || 0,
+        allocatedStakeholders: allocationRows.length,
         dailyQuantity: updateRows.reduce(
           (sum, row) => sum + Number(row.quantity || 0),
           0
@@ -205,17 +313,11 @@ export default function ProjectDashboardPage() {
           (sum, row) => sum + Number(row.persons_attended || 0),
           0
         ),
-        totalFunding: (funding.data || []).reduce(
-          (s, r) => s + Number(r.committed_amount || 0),
-          0
-        ),
-        totalBilled: (bills.data || []).reduce((s, r) => s + Number(r.amount || 0), 0),
-        totalPaid: (payments.data || []).reduce((s, r) => s + Number(r.amount || 0), 0),
       });
     }
 
     loadProjectStats();
-  }, [selectedProjectId, isStakeholder, profile?.stakeholder_id]);
+  }, [selectedProjectId]);
 
   const selectedProject = projects.find((p) => p.id === selectedProjectId);
   const selectedLocation = selectedProject ? formatProjectLocation(selectedProject) : null;
@@ -244,7 +346,7 @@ export default function ProjectDashboardPage() {
           <p className="mt-1 text-civic-600">
             {isStakeholder
               ? "Allocated projects and requirements assigned to you"
-              : "Progress, funding, and billing overview by project"}
+              : "Progress and quantity overview by project"}
           </p>
         </div>
         <div className="w-full sm:w-96">
@@ -309,20 +411,7 @@ export default function ProjectDashboardPage() {
               label: "Participants",
               value: stats.participants.toLocaleString("en-IN"),
             },
-            { label: "Project Activities", value: stats.activityCount },
             { label: "Daily Updates", value: stats.updateCount },
-            {
-              label: "Total Funding",
-              value: `₹${stats.totalFunding.toLocaleString("en-IN")}`,
-            },
-            {
-              label: "Total Billed",
-              value: `₹${stats.totalBilled.toLocaleString("en-IN")}`,
-            },
-            {
-              label: "Total Paid",
-              value: `₹${stats.totalPaid.toLocaleString("en-IN")}`,
-            },
           ].map((card) => (
             <div
               key={card.label}
@@ -334,6 +423,94 @@ export default function ProjectDashboardPage() {
           ))}
         </div>
       )}
+
+      <div className="overflow-hidden rounded-xl border border-civic-100 bg-white shadow-sm">
+        <div className="flex items-center justify-between border-b border-civic-100 px-5 py-4">
+          <div>
+            <h2 className="text-lg font-semibold text-civic-900">
+              Stakeholders by quantity
+            </h2>
+            <p className="mt-0.5 text-sm text-civic-600">
+              Ranked by quantity entered in daily activities for this project
+            </p>
+          </div>
+          <Link
+            href="/dashboard/masters/stakeholder-allocations"
+            className="text-sm font-medium text-civic-700 hover:underline"
+          >
+            View allocations
+          </Link>
+        </div>
+        {rankedStakeholders.length === 0 ? (
+          <p className="px-5 py-8 text-sm text-civic-500">
+            No stakeholders are allocated to this project yet.
+          </p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[720px] text-left text-sm">
+              <thead className="border-b border-civic-100 bg-civic-50">
+                <tr>
+                  <th className="px-5 py-3 font-semibold text-civic-800">Rank</th>
+                  <th className="px-5 py-3 font-semibold text-civic-800">
+                    Stakeholder
+                  </th>
+                  <th className="px-5 py-3 font-semibold text-civic-800">
+                    Contact
+                  </th>
+                  <th className="px-5 py-3 text-right font-semibold text-civic-800">
+                    Quantity
+                  </th>
+                  <th className="px-5 py-3 text-right font-semibold text-civic-800">
+                    Participants
+                  </th>
+                  <th className="px-5 py-3 text-right font-semibold text-civic-800">
+                    Updates
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {rankedStakeholders.map((row) => (
+                  <tr
+                    key={row.id}
+                    className="border-b border-civic-50 last:border-0"
+                  >
+                    <td className="px-5 py-3 font-semibold text-civic-900">
+                      {row.rank}
+                    </td>
+                    <td className="px-5 py-3">
+                      <p className="font-medium text-civic-900">{row.name}</p>
+                      {row.category ? (
+                        <p className="text-xs text-civic-500">{row.category}</p>
+                      ) : null}
+                    </td>
+                    <td className="px-5 py-3 text-civic-700">
+                      {row.contactPerson || row.phone ? (
+                        <>
+                          {row.contactPerson ? <p>{row.contactPerson}</p> : null}
+                          {row.phone ? (
+                            <p className="text-xs text-civic-500">{row.phone}</p>
+                          ) : null}
+                        </>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                    <td className="px-5 py-3 text-right font-medium text-civic-900">
+                      {formatQuantity(row.quantity)}
+                    </td>
+                    <td className="px-5 py-3 text-right text-civic-700">
+                      {row.participants.toLocaleString("en-IN")}
+                    </td>
+                    <td className="px-5 py-3 text-right text-civic-700">
+                      {row.updateCount.toLocaleString("en-IN")}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
       <div className="rounded-xl border border-civic-100 bg-civic-50 p-5 text-sm text-civic-700">
         <p className="font-medium">Manage this project</p>
