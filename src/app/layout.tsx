@@ -16,10 +16,6 @@ export const metadata: Metadata = {
   title: "MyCityMyDuty",
   description:
     "Civic engagement platform — corporations, zones, wards, stakeholders, projects, activities, and billing",
-  icons: {
-    icon: "/mycitymyduty-logo.png",
-    apple: "/mycitymyduty-logo.png",
-  },
 };
 
 export default function RootLayout({

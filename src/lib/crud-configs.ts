@@ -1,5 +1,6 @@
 import type { ColumnConfig, FieldConfig } from "@/lib/types/database";
 import { APP_MODULE_OPTIONS } from "@/lib/modules";
+import { getNestedValue } from "@/lib/crud-filters";
 
 const corporationOptionsFrom = {
   table: "corporations",
@@ -79,7 +80,8 @@ const projectActivityOptionsFrom = {
   valueKey: "id",
   labelKeys: ["projects.name", "activities.name"],
   labelSeparator: " — ",
-  selectQuery: "id, projects(name), activities(name)",
+  selectQuery: "id, projects(name), activities(name, unit)",
+  metaKeys: ["activities.unit"],
 };
 
 const dailyUpdateOptionsFrom = {
@@ -806,22 +808,57 @@ export const crudConfigs = {
     title: "Daily Activity Updates",
     description: "Daily work progress reported by stakeholders",
     table: "daily_activity_updates",
-    selectQuery: "*, project_activities(projects(name), activities(name)), stakeholders(name)",
+    selectQuery: "*, project_activities(projects(name), activities(name, unit)), stakeholders(name)",
     columns: [
       { key: "update_date", label: "Date" },
       { key: "project_activities.projects.name", label: "Project" },
       { key: "project_activities.activities.name", label: "Activity" },
       { key: "stakeholders.name", label: "Stakeholder" },
-      { key: "progress_pct", label: "Progress %" },
+      { key: "persons_attended", label: "Persons Attended" },
+      {
+        key: "quantity",
+        label: "Quantity",
+        render: (row) => {
+          const qty = row.quantity;
+          if (qty === null || qty === undefined || qty === "") return "—";
+          const unit = getNestedValue(row, "project_activities.activities.unit");
+          return unit ? `${qty} ${String(unit)}` : String(qty);
+        },
+      },
+      { key: "description", label: "Description" },
       { key: "approval_status", label: "Approval" },
-      { key: "work_description", label: "Work Done" },
+      { key: "work_description", label: "Work Done", filterable: false },
     ] as ColumnConfig[],
     fields: [
       { name: "project_activity_id", label: "Project Activity", type: "select", required: true, optionsFrom: projectActivityOptionsFrom },
       { name: "stakeholder_id", label: "Stakeholder", type: "select", required: true, optionsFrom: stakeholderOptionsFrom },
       { name: "update_date", label: "Update Date", type: "date", required: true },
       { name: "work_description", label: "Work Description", type: "textarea", required: true },
-      { name: "progress_pct", label: "Progress %", type: "number", defaultValue: 0 },
+      {
+        name: "persons_attended",
+        label: "Number of persons attended",
+        type: "number",
+        step: "1",
+        placeholder: "e.g. 12",
+      },
+      {
+        name: "quantity",
+        label: "Quantity",
+        type: "number",
+        step: "0.001",
+        placeholder: "e.g. No. of trees",
+        labelFromOption: {
+          sourceField: "project_activity_id",
+          metaKey: "unit",
+          template: "Quantity ({value})",
+        },
+      },
+      {
+        name: "description",
+        label: "Description",
+        type: "text",
+        placeholder: "e.g. Sapling Planted",
+      },
       { name: "remarks", label: "Remarks", type: "textarea" },
       ...geoFields,
       transactionalAttachmentsField,

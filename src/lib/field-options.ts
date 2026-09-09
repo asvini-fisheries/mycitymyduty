@@ -4,12 +4,25 @@ export interface FieldOption {
   value: string;
   label: string;
   filterValue?: string;
+  meta?: Record<string, string>;
 }
 
 export function getFieldLabel(
   field: FieldConfig,
-  formData: Record<string, string>
+  formData: Record<string, string>,
+  sourceOptions?: FieldOption[]
 ): string {
+  if (field.labelFromOption && sourceOptions?.length) {
+    const selected = sourceOptions.find(
+      (option) => option.value === (formData[field.labelFromOption!.sourceField] ?? "")
+    );
+    const hint = selected?.meta?.[field.labelFromOption.metaKey]?.trim();
+    if (hint) {
+      return field.labelFromOption.template
+        ? field.labelFromOption.template.replace(/\{value\}/g, hint)
+        : hint;
+    }
+  }
   if (field.dynamicLabel) {
     const key = formData[field.dynamicLabel.field] ?? "";
     return field.dynamicLabel.labels[key] ?? field.label;

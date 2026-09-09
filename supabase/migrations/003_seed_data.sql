@@ -32,7 +32,7 @@ VALUES
   ('Street Sweeping', 'Daily street cleaning', 'km'),
   ('Garbage Collection', 'Door-to-door waste pickup', 'trips'),
   ('Road Pothole Repair', 'Asphalt patching', 'sq.m'),
-  ('Tree Plantation', 'Planting saplings in wards', 'nos')
+  ('Tree Plantation', 'Planting saplings in wards', 'No. of trees')
 ON CONFLICT (name) DO NOTHING;
 
 DO $$

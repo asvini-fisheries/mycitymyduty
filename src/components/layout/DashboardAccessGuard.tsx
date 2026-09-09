@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAccess } from "@/contexts/AccessContext";
 import { getModuleKeyForPath } from "@/lib/modules";
+import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
 
 export function DashboardAccessGuard({
   children,
@@ -13,20 +14,52 @@ export function DashboardAccessGuard({
   const pathname = usePathname();
   const router = useRouter();
   const { loading, profile, canPath, isStakeholder } = useAccess();
+  const [hasSession, setHasSession] = useState<boolean | null>(
+    isSupabaseConfigured() ? null : true
+  );
 
   useEffect(() => {
-    if (loading || !profile) return;
-    if (!isStakeholder) return;
+    if (!isSupabaseConfigured()) {
+      setHasSession(true);
+      return;
+    }
+
+    let cancelled = false;
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data }) => {
+      if (cancelled) return;
+      const signedIn = Boolean(data.user);
+      setHasSession(signedIn);
+      if (!signedIn) {
+        router.replace("/login");
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
+
+  useEffect(() => {
+    if (loading || !profile || !isStakeholder) return;
 
     if (!canPath(pathname, "view")) {
       router.replace("/dashboard");
     }
   }, [canPath, isStakeholder, loading, pathname, profile, router]);
 
-  if (loading) {
+  if (loading || hasSession === null) {
     return (
       <div className="rounded-xl border border-civic-100 bg-white p-8 text-sm text-civic-600">
         Loading your access...
+      </div>
+    );
+  }
+
+  if (!hasSession) {
+    return (
+      <div className="rounded-xl border border-civic-100 bg-white p-8 text-sm text-civic-600">
+        Redirecting to sign in...
       </div>
     );
   }

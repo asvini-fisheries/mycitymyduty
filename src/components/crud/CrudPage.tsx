@@ -251,6 +251,22 @@ export function CrudPage({
                 ),
               }
             : {}),
+          ...(of.metaKeys?.length
+            ? {
+                meta: Object.fromEntries(
+                  of.metaKeys.map((key) => {
+                    const metaKey = key.includes(".")
+                      ? key.slice(key.lastIndexOf(".") + 1)
+                      : key;
+                    const val = getNestedValue(row, key);
+                    return [
+                      metaKey,
+                      val !== null && val !== undefined ? String(val) : "",
+                    ];
+                  })
+                ),
+              }
+            : {}),
         }));
       }
     }
@@ -436,7 +452,7 @@ export function CrudPage({
       const required = isFieldRequired(f, formData);
       const raw = formData[f.name];
       if (required && (raw === "" || raw === undefined)) {
-        alert(`${getFieldLabel(f, formData)} is required.`);
+        alert(`${getFieldLabel(f, formData, fieldOptions[f.labelFromOption?.sourceField ?? ""] ?? [])} is required.`);
         setSaving(false);
         return;
       }
@@ -579,7 +595,13 @@ export function CrudPage({
   function renderField(field: FieldConfig) {
     const value = formData[field.name] ?? "";
     const required = isFieldRequired(field, formData);
-    const label = getFieldLabel(field, formData);
+    const label = getFieldLabel(
+      field,
+      formData,
+      field.labelFromOption
+        ? fieldOptions[field.labelFromOption.sourceField]
+        : undefined
+    );
 
     if (field.type === "attachments") {
       return (
@@ -817,15 +839,27 @@ export function CrudPage({
     excelFileName ?? title.replace(/\s+/g, "_").toLowerCase();
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-civic-900">{title}</h1>
-            {description && (
-              <p className="mt-1 text-sm text-civic-600">{description}</p>
-            )}
-          </div>
+    <div className="space-y-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-bold text-civic-900">{title}</h1>
+          {description && (
+            <p className="mt-1 text-sm text-civic-600">{description}</p>
+          )}
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <ExcelToolbar
+            title={title}
+            fileName={exportName}
+            columns={columns}
+            fields={formFields}
+            rows={filteredRows}
+            totalRowCount={rows.length}
+            isFilterActive={isFilterActive}
+            fieldOptions={fieldOptions}
+            allowImport={canImport}
+            onImport={handleImport}
+          />
           <Button
             onClick={onAddNew ?? openCreate}
             disabled={!canCreate}
@@ -834,34 +868,22 @@ export function CrudPage({
             {addButtonLabel ?? "Add New"}
           </Button>
         </div>
-        <ExcelToolbar
-          title={title}
-          fileName={exportName}
-          columns={columns}
-          fields={formFields}
-          rows={filteredRows}
-          totalRowCount={rows.length}
-          isFilterActive={isFilterActive}
-          fieldOptions={fieldOptions}
-          allowImport={canImport}
-          onImport={handleImport}
-        />
-        {!loading && !error && rows.length > 0 && (
-          <SearchFilterBar
-            searchQuery={searchQuery}
-            onSearchChange={setSearchQuery}
-            columnFilters={columnFilters}
-            onColumnFilterChange={(key, value) =>
-              setColumnFilters((prev) => ({ ...prev, [key]: value }))
-            }
-            onClearAll={handleClearAllFilters}
-            onRemoveChip={handleRemoveFilterChip}
-            filterableColumns={filterableColumns}
-            filteredCount={filteredRows.length}
-            totalCount={rows.length}
-          />
-        )}
       </div>
+      {!loading && !error && rows.length > 0 && (
+        <SearchFilterBar
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          columnFilters={columnFilters}
+          onColumnFilterChange={(key, value) =>
+            setColumnFilters((prev) => ({ ...prev, [key]: value }))
+          }
+          onClearAll={handleClearAllFilters}
+          onRemoveChip={handleRemoveFilterChip}
+          filterableColumns={filterableColumns}
+          filteredCount={filteredRows.length}
+          totalCount={rows.length}
+        />
+      )}
 
       {error && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">

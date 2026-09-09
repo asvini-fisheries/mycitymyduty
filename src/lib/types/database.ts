@@ -47,6 +47,8 @@ export interface FieldConfig {
     selectQuery?: string;
     /** Filter dropdown options by a form field value (e.g. project record type). */
     filterByFormField?: { formField: string; rowKey: string };
+    /** Nested row keys copied onto the option (last path segment becomes the meta key). */
+    metaKeys?: string[];
   };
   defaultValue?: string | number | boolean;
   step?: string;
@@ -56,6 +58,12 @@ export interface FieldConfig {
   editValueFrom?: string;
   /** Change label based on another form field's value. */
   dynamicLabel?: { field: string; labels: Record<string, string> };
+  /** Change label using metadata from another select field's selected option. */
+  labelFromOption?: {
+    sourceField: string;
+    metaKey: string;
+    template?: string;
+  };
   /** Clear these form fields when this field changes. */
   clearsOnChange?: string[];
   /** When true, textarea value is split into a TEXT[] on save (one entry per line). */
@@ -76,6 +84,8 @@ export interface ColumnConfig {
   key: string;
   label: string;
   render?: (row: Record<string, unknown>) => ReactNode;
+  /** When false, this column is not shown in the filter bar. */
+  filterable?: boolean;
 }
 
 export interface GeoCoordinates {
@@ -171,6 +181,9 @@ export interface DailyActivityUpdate extends GeoCoordinates, ApprovalWorkflow {
   stakeholder_id: string;
   update_date: string;
   work_description: string;
+  persons_attended: number | null;
+  quantity: number | null;
+  description: string | null;
   progress_pct: number;
   remarks: string | null;
   attachments: RecordAttachment[] | null;

@@ -36,7 +36,7 @@ export async function updateSession(request: NextRequest) {
     user = authUser;
   } catch {
     // Supabase unreachable in edge middleware — avoid 500; treat as unauthenticated
-    return supabaseResponse;
+    user = null;
   }
 
   const pathname = request.nextUrl.pathname;
@@ -44,13 +44,13 @@ export async function updateSession(request: NextRequest) {
   const isAuthApi = pathname.startsWith("/api/auth/");
   const isPublic = isLoginPage || isAuthApi;
 
-  if (!user && !isPublic && pathname !== "/") {
+  if (!user && !isPublic) {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = "/login";
     return NextResponse.redirect(redirectUrl);
   }
 
-  if (user && isLoginPage) {
+  if (user && (isLoginPage || pathname === "/")) {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = "/dashboard";
     return NextResponse.redirect(redirectUrl);

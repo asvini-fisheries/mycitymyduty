@@ -1,7 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertCircle, CheckCircle2, Download, FileSpreadsheet, Upload } from "lucide-react";
+import {
+  AlertCircle,
+  CheckCircle2,
+  ChevronDown,
+  Download,
+  FileSpreadsheet,
+  Upload,
+} from "lucide-react";
 import type { ColumnConfig, FieldConfig } from "@/lib/types/database";
 import {
   buildExportColumns,
@@ -54,6 +61,9 @@ export function ExcelToolbar({
     () => new Set(exportColumns.map((c) => c.key))
   );
 
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
   const totalRows = totalRowCount ?? rows.length;
   const selectedCount = selected.size;
   const totalColumns = exportColumns.length;
@@ -61,6 +71,17 @@ export function ExcelToolbar({
   useEffect(() => {
     setSelected(new Set(exportColumns.map((c) => c.key)));
   }, [exportColumns]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    function handlePointerDown(event: MouseEvent) {
+      if (!menuRef.current?.contains(event.target as Node)) {
+        setMenuOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => document.removeEventListener("mousedown", handlePointerDown);
+  }, [menuOpen]);
 
   const logEntries = useMemo(() => {
     if (!importResult) return [];
@@ -164,48 +185,89 @@ export function ExcelToolbar({
 
   return (
     <>
-      <div className="flex flex-wrap gap-2">
-        <Button variant="secondary" size="sm" onClick={openExportModal}>
-          <Download className="mr-1.5 h-4 w-4" />
-          Export Excel
+      <div className="relative" ref={menuRef}>
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          onClick={() => setMenuOpen((open) => !open)}
+          aria-expanded={menuOpen}
+          aria-haspopup="menu"
+        >
+          <FileSpreadsheet className="mr-1.5 h-4 w-4" />
+          Excel
+          <ChevronDown className="ml-1 h-3.5 w-3.5" />
         </Button>
-        {allowImport && (
-          <>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => downloadImportTemplate(title, fields, fieldOptions)}
+        {menuOpen && (
+          <div
+            role="menu"
+            className="absolute right-0 z-30 mt-1 w-48 rounded-lg border border-civic-200 bg-white py-1 shadow-lg"
+          >
+            <button
+              type="button"
+              role="menuitem"
+              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-civic-800 hover:bg-civic-50"
+              onClick={() => {
+                setMenuOpen(false);
+                openExportModal();
+              }}
             >
-              <FileSpreadsheet className="mr-1.5 h-4 w-4" />
-              Download Template
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              disabled={importing}
-              onClick={() => fileRef.current?.click()}
-            >
-              <Upload className="mr-1.5 h-4 w-4" />
-              {importing ? "Importing..." : "Upload Excel"}
-            </Button>
-            {importResult && (
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => setImportLogOpen(true)}
-              >
-                <AlertCircle className="mr-1.5 h-4 w-4" />
-                Import log
-              </Button>
+              <Download className="h-4 w-4" />
+              Export Excel
+            </button>
+            {allowImport && (
+              <>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-civic-800 hover:bg-civic-50"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    downloadImportTemplate(title, fields, fieldOptions);
+                  }}
+                >
+                  <FileSpreadsheet className="h-4 w-4" />
+                  Download Template
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  disabled={importing}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-civic-800 hover:bg-civic-50 disabled:opacity-50"
+                  onClick={() => {
+                    fileRef.current?.click();
+                    setMenuOpen(false);
+                  }}
+                >
+                  <Upload className="h-4 w-4" />
+                  {importing ? "Importing..." : "Upload Excel"}
+                </button>
+                {importResult && (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-civic-800 hover:bg-civic-50"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      setImportLogOpen(true);
+                    }}
+                  >
+                    <AlertCircle className="h-4 w-4" />
+                    Import log
+                  </button>
+                )}
+              </>
             )}
-            <input
-              ref={fileRef}
-              type="file"
-              accept=".xlsx,.xls"
-              className="hidden"
-              onChange={handleFileChange}
-            />
-          </>
+          </div>
+        )}
+        {allowImport && (
+          <input
+            ref={fileRef}
+            type="file"
+            accept=".xlsx,.xls"
+            className="hidden"
+            onChange={handleFileChange}
+          />
         )}
       </div>
 

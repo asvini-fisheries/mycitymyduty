@@ -144,7 +144,8 @@ export function deriveFilterableColumns(
   const result: FilterableColumn[] = [];
 
   for (const column of columns) {
-    if (column.render) continue;
+    if (column.filterable === false) continue;
+    if (column.key === "progress_pct") continue;
 
     const field = mapColumnToField(column, fields);
     const filterType = resolveFilterType(field);
