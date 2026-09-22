@@ -11,7 +11,7 @@ import {
 export const PARTICIPATION_TABLE = "project_member_participations";
 
 export const PARTICIPATION_CERTIFICATE_SELECT =
-  "id, project_id, stakeholder_id, participation_date, notes, certificate_issued_at, projects(id, name, code, record_type, corporation_id, corporations(name, logo_url)), stakeholders(id, name), stakeholder_members(name, phone, role)";
+  "id, project_id, stakeholder_id, participation_date, notes, certificate_issued_at, projects(id, name, code, record_type, corporation_id, certificate_template_url, corporations(name, logo_url)), stakeholders(id, name), stakeholder_members(name, phone, role)";
 
 export type Nested = Record<string, unknown> | Record<string, unknown>[] | null;
 
@@ -46,6 +46,15 @@ export function overlayLengthClass(value: string) {
 
 export function nestedName(value: Nested, fallback = ""): string {
   return text(firstRecord(value)?.name, fallback);
+}
+
+export const DEFAULT_CERTIFICATE_TEMPLATE =
+  "/certificates/coastal-cleanup-2026.jpg";
+
+export function getCertificateTemplateUrl(project: Nested): string {
+  const url = firstRecord(project)?.certificate_template_url;
+  if (typeof url === "string" && url.trim()) return url.trim();
+  return DEFAULT_CERTIFICATE_TEMPLATE;
 }
 
 export function projectLabel(value: Nested): string {

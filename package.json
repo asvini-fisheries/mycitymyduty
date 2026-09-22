@@ -24,6 +24,7 @@
     "db:migrate:project-qty-numeric": "node scripts/run-migration.mjs 020_project_quantity_numeric.sql",
     "db:migrate:stakeholder-zone": "node scripts/run-migration.mjs 021_stakeholder_zone.sql",
     "db:migrate:participations": "node scripts/run-migration.mjs 022_project_member_participations.sql",
+    "db:migrate:certificate-template": "node scripts/run-migration.mjs 023_project_certificate_template.sql",
     "db:setup-storage": "node scripts/setup-storage.mjs",
     "db:verify": "node scripts/verify-setup.mjs",
     "auth:disable-email-confirm": "node scripts/disable-email-confirm.mjs",

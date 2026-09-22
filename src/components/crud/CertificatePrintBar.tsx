@@ -8,6 +8,7 @@ import { useAccess } from "@/contexts/AccessContext";
 import {
   fetchCertificateParticipations,
   firstRecord,
+  getCertificateTemplateUrl,
   nestedName,
   projectLabel,
   type ParticipationRow,
@@ -109,6 +110,19 @@ export function CertificatePrintBar() {
     }).length;
   }, [rows, projectId, stakeholderId]);
 
+  const selectedTemplateUrl = useMemo(() => {
+    if (!projectId) return null;
+    const match = rows.find((row) => row.project_id === projectId);
+    return match ? getCertificateTemplateUrl(match.projects) : null;
+  }, [rows, projectId]);
+
+  const hasCustomTemplate = useMemo(() => {
+    if (!projectId) return false;
+    const match = rows.find((row) => row.project_id === projectId);
+    const url = firstRecord(match?.projects ?? null)?.certificate_template_url;
+    return typeof url === "string" && url.trim().length > 0;
+  }, [rows, projectId]);
+
   function handleProjectChange(value: string) {
     setProjectId(value);
     if (!lockedStakeholderId) {
@@ -136,7 +150,8 @@ export function CertificatePrintBar() {
           </p>
           <p className="mt-0.5 text-xs text-civic-600">
             Choose a project, optionally a stakeholder, then print every matching
-            participant certificate as one PDF.
+            participant certificate as one PDF. Upload each project’s template in
+            Projects / Requirements.
           </p>
         </div>
         <div className="grid w-full gap-3 sm:grid-cols-2 lg:w-auto lg:min-w-[34rem]">
@@ -195,6 +210,19 @@ export function CertificatePrintBar() {
                     ? "No matching participants."
                     : `${matchingCount} certificate${matchingCount === 1 ? "" : "s"}`}
           </p>
+          {projectId && selectedTemplateUrl ? (
+            <div className="flex items-center gap-2">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={selectedTemplateUrl}
+                alt="Certificate template"
+                className="h-10 w-16 rounded border border-civic-200 object-cover"
+              />
+              <span className="text-[11px] text-civic-500">
+                {hasCustomTemplate ? "Project template" : "Default template"}
+              </span>
+            </div>
+          ) : null}
         </div>
       </div>
     </div>

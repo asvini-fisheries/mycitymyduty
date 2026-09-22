@@ -76,7 +76,7 @@ export function buildExportColumns(
   }
 
   for (const field of fields) {
-    if (field.type === "attachments") continue;
+    if (field.type === "attachments" || field.type === "logo") continue;
     if (seenKeys.has(field.name)) continue;
 
     const hasJoinedDisplay = fieldHasJoinedColumn(field, seenKeys);
@@ -115,6 +115,7 @@ export function downloadImportTemplate(
   const usableFields = fields.filter(
     (f) =>
       f.type !== "attachments" &&
+      f.type !== "logo" &&
       !f.formOnly &&
       (f.type !== "checkbox" || f.name)
   );
@@ -227,7 +228,7 @@ export function summarizeImportRow(
 ): string {
   const parts: string[] = [];
   for (const field of fields) {
-    if (field.type === "checkbox" || field.type === "attachments") {
+    if (field.type === "checkbox" || field.type === "attachments" || field.type === "logo") {
       continue;
     }
     const val = payload[field.name];
@@ -321,7 +322,7 @@ export function parseImportFile(
     let rowError = false;
 
     for (const { field, colIdx } of colMap) {
-      if (field.formOnly) continue;
+      if (field.formOnly || field.type === "logo") continue;
       let raw = String(row[colIdx] ?? "").trim();
       if (raw === "" && !field.required) {
         if (field.type === "checkbox") {

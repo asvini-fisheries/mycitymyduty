@@ -13,6 +13,8 @@ interface LogoUploadFieldProps {
   recordId?: string;
   onFileSelected?: (file: File | null) => void;
   accept?: string;
+  variant?: "logo" | "certificate";
+  onUpload?: (file: File, recordId: string) => Promise<string>;
 }
 
 export function LogoUploadField({
@@ -23,6 +25,8 @@ export function LogoUploadField({
   recordId,
   onFileSelected,
   accept = "image/jpeg,image/png,image/webp",
+  variant = "logo",
+  onUpload,
 }: LogoUploadFieldProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -49,7 +53,9 @@ export function LogoUploadField({
 
     setUploading(true);
     try {
-      const url = await uploadCorporationLogo(file, recordId);
+      const url = onUpload
+        ? await onUpload(file, recordId)
+        : await uploadCorporationLogo(file, recordId);
       onChange(url);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed.");
@@ -72,6 +78,16 @@ export function LogoUploadField({
   }
 
   const displayUrl = previewUrl || value || null;
+  const isCertificate = variant === "certificate";
+  const actionLabel = uploading
+    ? "Uploading..."
+    : displayUrl
+      ? isCertificate
+        ? "Replace template"
+        : "Replace logo"
+      : isCertificate
+        ? "Upload template"
+        : "Upload logo";
 
   return (
     <div className="space-y-3 sm:col-span-2">
@@ -89,7 +105,7 @@ export function LogoUploadField({
           ) : (
             <ImagePlus className="mr-2 h-4 w-4" />
           )}
-          {uploading ? "Uploading..." : displayUrl ? "Replace logo" : "Upload logo"}
+          {actionLabel}
         </Button>
       </div>
 
@@ -104,8 +120,9 @@ export function LogoUploadField({
 
       {!recordId && (
         <p className="text-xs text-civic-500">
-          Logo uploads immediately when editing. For new corporations, save first — a
-          pending logo will upload on save.
+          {isCertificate
+            ? "The template uploads immediately when editing. For a new project, save first — a pending template will upload on save."
+            : "Logo uploads immediately when editing. For new corporations, save first — a pending logo will upload on save."}
         </p>
       )}
 
@@ -120,20 +137,30 @@ export function LogoUploadField({
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={displayUrl}
-            alt="Corporation logo preview"
-            className="h-20 w-20 rounded-lg border border-civic-200 bg-white object-contain p-1"
+            alt={isCertificate ? "Certificate template preview" : "Corporation logo preview"}
+            className={
+              isCertificate
+                ? "h-28 w-44 rounded-lg border border-civic-200 bg-white object-cover"
+                : "h-20 w-20 rounded-lg border border-civic-200 bg-white object-contain p-1"
+            }
           />
           <div className="flex flex-1 flex-col gap-2">
-            <p className="text-sm text-civic-700">Corporation logo (JPG, PNG, or WebP, max 5 MB)</p>
+            <p className="text-sm text-civic-700">
+              {isCertificate
+                ? "Certificate template (JPG, PNG, or WebP, max 5 MB). Participant name and organisation are printed on this image."
+                : "Corporation logo (JPG, PNG, or WebP, max 5 MB)"}
+            </p>
             <Button type="button" variant="ghost" size="sm" onClick={handleRemove}>
               <Trash2 className="mr-2 h-4 w-4 text-red-600" />
-              Remove logo
+              {isCertificate ? "Remove template" : "Remove logo"}
             </Button>
           </div>
         </div>
       ) : (
         <p className="rounded-lg border border-dashed border-civic-200 bg-civic-50/50 px-4 py-6 text-center text-sm text-civic-500">
-          No logo uploaded. Use &quot;Upload logo&quot; to add your corporation brand mark.
+          {isCertificate
+            ? 'No certificate template uploaded. Use "Upload template" to add this project\'s appreciation certificate.'
+            : 'No logo uploaded. Use "Upload logo" to add your corporation brand mark.'}
         </p>
       )}
     </div>

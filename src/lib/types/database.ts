@@ -74,6 +74,8 @@ export interface FieldConfig {
   multiple?: boolean;
   /** For attachments fields: file input accept attribute. */
   accept?: string;
+  /** Preview and upload copy for logo-type image fields. */
+  imageKind?: "logo" | "certificate";
   /** Span full width in the form grid. */
   fullWidth?: boolean;
   /** Show this field only when another field matches a value. */
@@ -174,6 +176,7 @@ export interface Project extends GeoCoordinates, ApprovalWorkflow {
   budget: number;
   status: ProjectStatus;
   attachments: RecordAttachment[] | null;
+  certificate_template_url: string | null;
   created_at: string;
   updated_at: string;
   corporations?: Corporation;

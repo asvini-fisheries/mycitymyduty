@@ -10,6 +10,7 @@ import {
 } from "@/components/print/CertificateSheet";
 import {
   firstRecord,
+  getCertificateTemplateUrl,
   markCertificatesIssued,
   nestedName,
   text,
@@ -35,7 +36,7 @@ export default function AppreciationCertificatePage() {
       const { data, error: fetchError } = await supabase
         .from("project_member_participations")
         .select(
-          "id, participation_date, notes, certificate_issued_at, projects(name, code, record_type, corporations(name, logo_url)), stakeholders(name), stakeholder_members(name, phone, role)"
+          "id, participation_date, notes, certificate_issued_at, projects(name, code, record_type, certificate_template_url, corporations(name, logo_url)), stakeholders(name), stakeholder_members(name, phone, role)"
         )
         .eq("id", id)
         .maybeSingle();
@@ -92,6 +93,7 @@ export default function AppreciationCertificatePage() {
       <CertificateSheet
         memberName={memberName}
         stakeholderName={stakeholderName}
+        templateSrc={getCertificateTemplateUrl(row.projects)}
       />
     </div>
   );

@@ -91,6 +91,36 @@ export async function uploadCorporationLogo(
   return data.publicUrl;
 }
 
+export async function uploadCertificateTemplate(
+  file: File,
+  projectId: string
+): Promise<string> {
+  const validationError = validateImageFile(file);
+  if (validationError) {
+    throw new Error(validationError);
+  }
+
+  const supabase = createClient();
+  const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
+  const safeExt = ["jpg", "jpeg", "png", "webp"].includes(ext) ? ext : "jpg";
+  const objectPath = `projects/${projectId}/certificate-template.${safeExt}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from(ATTACHMENTS_BUCKET)
+    .upload(objectPath, file, {
+      cacheControl: "3600",
+      upsert: true,
+      contentType: file.type,
+    });
+
+  if (uploadError) {
+    throw new Error(uploadError.message);
+  }
+
+  const { data } = supabase.storage.from(ATTACHMENTS_BUCKET).getPublicUrl(objectPath);
+  return data.publicUrl;
+}
+
 export async function uploadAttachmentFile(
   file: File,
   table: string,

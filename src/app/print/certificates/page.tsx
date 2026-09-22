@@ -9,6 +9,7 @@ import {
 import {
   fetchCertificateParticipations,
   firstRecord,
+  getCertificateTemplateUrl,
   markCertificatesIssued,
   nestedName,
   text,
@@ -144,6 +145,7 @@ export default function BatchCertificatesPage() {
             key={row.id}
             memberName={memberName}
             stakeholderName={stakeholderName}
+            templateSrc={getCertificateTemplateUrl(row.projects)}
           />
         );
       })}

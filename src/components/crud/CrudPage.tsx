@@ -27,6 +27,7 @@ import {
   parseAttachments,
   serializeAttachments,
   uploadCorporationLogo,
+  uploadCertificateTemplate,
   type RecordAttachment,
 } from "@/lib/attachments";
 import {
@@ -603,10 +604,13 @@ export function CrudPage({
             for (const field of logoFields) {
               const pendingFile = pendingLogoFiles[field.name];
               if (pendingFile) {
-                const logoUrl = await uploadCorporationLogo(pendingFile, newRecordId);
+                const imageUrl =
+                  field.imageKind === "certificate"
+                    ? await uploadCertificateTemplate(pendingFile, newRecordId)
+                    : await uploadCorporationLogo(pendingFile, newRecordId);
                 await supabase
                   .from(table)
-                  .update({ [field.name]: logoUrl })
+                  .update({ [field.name]: imageUrl })
                   .eq(idKey, newRecordId);
               }
             }
@@ -669,6 +673,12 @@ export function CrudPage({
             setFormData((prev) => ({ ...prev, [field.name]: next }))
           }
           recordId={editing ? String(editing[idKey]) : undefined}
+          variant={field.imageKind === "certificate" ? "certificate" : "logo"}
+          onUpload={
+            field.imageKind === "certificate"
+              ? uploadCertificateTemplate
+              : uploadCorporationLogo
+          }
           onFileSelected={(file) =>
             setPendingLogoFiles((prev) => {
               const next = { ...prev };
@@ -781,7 +791,7 @@ export function CrudPage({
         lockedStakeholderId
       );
       for (const field of fields) {
-        if (field.formOnly) {
+        if (field.formOnly || field.type === "logo") {
           delete payload[field.name];
         }
       }
@@ -997,10 +1007,32 @@ export function CrudPage({
                     className="border-b border-civic-50 hover:bg-civic-50/50"
                   >
                     {columns.map((col) => {
-                      const display = formatCellValueForColumn(
-                        col.key,
-                        getNestedValue(row, col.key)
+                      const value = getNestedValue(row, col.key);
+                      const imageField = fields.find(
+                        (field) => field.name === col.key && field.type === "logo"
                       );
+                      if (imageField) {
+                        const url = value ? String(value) : "";
+                        return (
+                          <td key={col.key} className="px-4 py-3 text-civic-700">
+                            {url ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={url}
+                                alt={imageField.label}
+                                className={
+                                  imageField.imageKind === "certificate"
+                                    ? "h-12 w-[4.5rem] rounded border border-civic-200 object-cover"
+                                    : "h-9 w-9 rounded border border-civic-200 bg-white object-contain p-0.5"
+                                }
+                              />
+                            ) : (
+                              <span className="text-civic-400">Not added</span>
+                            )}
+                          </td>
+                        );
+                      }
+                      const display = formatCellValueForColumn(col.key, value);
                       const suffix = col.suffixFrom
                         ? getNestedValue(row, col.suffixFrom)
                         : null;

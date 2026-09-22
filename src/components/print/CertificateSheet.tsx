@@ -39,13 +39,13 @@ export const CERTIFICATE_PRINT_CSS = `
     white-space: nowrap;
   }
   .certificate-line--name {
-    top: 41.4%;
+    top: 40.4%;
     height: 5.2%;
     font-size: 2.35cqw;
     font-weight: 600;
   }
   .certificate-line--org {
-    top: 50.6%;
+    top: 49.5%;
     height: 5.1%;
     font-size: 1.95cqw;
     font-weight: 600;
@@ -85,13 +85,13 @@ export const CERTIFICATE_PRINT_CSS = `
       line-height: 1.15;
     }
     .certificate-line--name {
-      top: 43.4%;
+      top: 42%;
       height: 3.8%;
       font-size: 1.7rem;
       font-weight: 700;
     }
     .certificate-line--org {
-      top: 52.5%;
+      top: 51.1%;
       height: 3.7%;
       font-size: 1.35rem;
       font-weight: 600;
@@ -110,16 +110,18 @@ export function CertificatePrintStyles() {
 export function CertificateSheet({
   memberName,
   stakeholderName,
+  templateSrc = "/certificates/coastal-cleanup-2026.jpg",
 }: {
   memberName: string;
   stakeholderName: string;
+  templateSrc?: string;
 }) {
   return (
     <article className="certificate-sheet">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src="/certificates/coastal-cleanup-2026.jpg"
-        alt="International Coastal Cleanup 2026 certificate"
+        src={templateSrc}
+        alt="Appreciation certificate"
       />
       <p
         className={`certificate-line certificate-line--name ${overlayLengthClass(memberName)}`}
