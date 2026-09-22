@@ -1,4 +1,5 @@
 import { CrudPage } from "@/components/crud/CrudPage";
+import { CertificatePrintBar } from "@/components/crud/CertificatePrintBar";
 import { crudConfigs } from "@/lib/crud-configs";
 
 export default function Page() {
@@ -7,6 +8,7 @@ export default function Page() {
       {...crudConfigs.projectMemberParticipations}
       printVoucher="certificate"
       pageSize={25}
+      beforeTable={<CertificatePrintBar />}
     />
   );
 }

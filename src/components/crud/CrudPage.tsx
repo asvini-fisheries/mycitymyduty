@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Images, Pencil, Plus, Printer, Trash2 } from "lucide-react";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
 import type { ColumnConfig, FieldConfig } from "@/lib/types/database";
@@ -86,6 +86,7 @@ interface CrudPageProps {
   defaultLatestCorporation?: boolean;
   skipCorporationScope?: boolean;
   pageSize?: number;
+  beforeTable?: ReactNode;
 }
 
 type Row = Record<string, unknown>;
@@ -112,6 +113,7 @@ export function CrudPage({
   skipCorporationScope = false,
   moduleKey,
   pageSize,
+  beforeTable,
 }: CrudPageProps) {
   const { isStakeholder, profile } = useAccess();
   const resolvedModuleKey = moduleKey ?? TABLE_MODULE_MAP[table];
@@ -905,6 +907,7 @@ export function CrudPage({
           </Button>
         </div>
       </div>
+      {beforeTable}
       {!loading && !error && rows.length > 0 && (
         <SearchFilterBar
           searchQuery={searchQuery}
