@@ -66,6 +66,8 @@ export interface FieldConfig {
   };
   /** Clear these form fields when this field changes. */
   clearsOnChange?: string[];
+  /** When this select changes, copy the chosen option label into another form field. */
+  copiesOptionLabelTo?: string;
   /** When true, textarea value is split into a TEXT[] on save (one entry per line). */
   arrayField?: boolean;
   /** For attachments fields: allow multiple images. */

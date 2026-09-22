@@ -98,6 +98,12 @@ export const APP_MODULE_OPTIONS: { value: ModuleKey; label: string }[] = [
   { value: MODULE_KEYS.corporations, label: "Corporations" },
 ];
 
+export function getModuleLabel(moduleKey: string | null | undefined): string {
+  if (!moduleKey) return "—";
+  const match = APP_MODULE_OPTIONS.find((option) => option.value === moduleKey);
+  return match?.label ?? moduleKey;
+}
+
 /** Map dashboard routes to module keys (longest prefix wins in guard). */
 export const HREF_MODULE_MAP: { href: string; moduleKey: ModuleKey }[] = [
   { href: "/dashboard/masters/corporations", moduleKey: MODULE_KEYS.corporations },

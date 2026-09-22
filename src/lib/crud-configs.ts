@@ -404,6 +404,7 @@ export const crudConfigs = {
     selectQuery: "*, stakeholder_categories(name)",
     columns: [
       { key: "stakeholder_categories.name", label: "Category" },
+      { key: "module_key", label: "Screen" },
       { key: "module_label", label: "Module" },
       { key: "can_view", label: "View" },
       { key: "can_create", label: "Create" },
@@ -412,13 +413,20 @@ export const crudConfigs = {
     ] as ColumnConfig[],
     fields: [
       { name: "stakeholder_category_id", label: "Stakeholder Category", type: "select", required: true, optionsFrom: stakeholderCategoryOptionsFrom },
-      { name: "module_key", label: "Screen / Module", type: "select", required: true, options: appModules },
+      {
+        name: "module_key",
+        label: "Screen",
+        type: "select",
+        required: true,
+        options: appModules,
+        copiesOptionLabelTo: "module_label",
+      },
       {
         name: "module_label",
-        label: "Module Label",
+        label: "Module label",
         type: "text",
         required: true,
-        placeholder: "Auto-filled from module selection",
+        placeholder: "Filled from the selected screen",
       },
       { name: "can_view", label: "Can View", type: "checkbox", defaultValue: true },
       { name: "can_create", label: "Can Create", type: "checkbox", defaultValue: false },

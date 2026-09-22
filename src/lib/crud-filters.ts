@@ -1,4 +1,5 @@
 import type { ColumnConfig, FieldConfig } from "@/lib/types/database";
+import { getModuleLabel } from "@/lib/modules";
 
 export type Row = Record<string, unknown>;
 export type FilterType = "select" | "boolean" | "text";
@@ -42,6 +43,9 @@ export function formatCellValueForColumn(columnKey: string, value: unknown): str
   ) {
     if (value === "project") return "Project";
     if (value === "requirement") return "Requirement";
+  }
+  if (columnKey === "module_key") {
+    return getModuleLabel(value === null || value === undefined ? "" : String(value));
   }
   return formatCellValue(value);
 }
@@ -211,7 +215,7 @@ export function applySearchAndFilters(
     result = result.filter((row) =>
       columns.some((col) => {
         const val = getNestedValue(row, col.key);
-        return formatCellValue(val).toLowerCase().includes(q);
+        return formatCellValueForColumn(col.key, val).toLowerCase().includes(q);
       })
     );
   }

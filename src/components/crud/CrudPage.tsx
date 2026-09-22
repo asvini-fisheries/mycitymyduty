@@ -418,6 +418,11 @@ export function CrudPage({
       for (const cleared of field.clearsOnChange ?? []) {
         next[cleared] = "";
       }
+      if (field.copiesOptionLabelTo) {
+        const options = fieldOptions[field.name] || field.options || [];
+        const match = options.find((option) => option.value === nextValue);
+        next[field.copiesOptionLabelTo] = match?.label ?? "";
+      }
       return next;
     });
   }
