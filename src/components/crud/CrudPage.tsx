@@ -773,6 +773,11 @@ export function CrudPage({
         fields,
         lockedStakeholderId
       );
+      for (const field of fields) {
+        if (field.formOnly) {
+          delete payload[field.name];
+        }
+      }
       const summary = summarizeImportRow(payload, formFields, fieldOptions);
       if (allocatedIds) {
         const allowed = await payloadIsWithinAllocatedProjects(

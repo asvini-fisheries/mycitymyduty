@@ -113,7 +113,10 @@ export function downloadImportTemplate(
   fieldOptions: Record<string, { value: string; label: string }[]>
 ) {
   const usableFields = fields.filter(
-    (f) => f.type !== "attachments" && (f.type !== "checkbox" || f.name)
+    (f) =>
+      f.type !== "attachments" &&
+      !f.formOnly &&
+      (f.type !== "checkbox" || f.name)
   );
 
   const headers = usableFields.map((f) => f.label);
@@ -318,6 +321,7 @@ export function parseImportFile(
     let rowError = false;
 
     for (const { field, colIdx } of colMap) {
+      if (field.formOnly) continue;
       let raw = String(row[colIdx] ?? "").trim();
       if (raw === "" && !field.required) {
         if (field.type === "checkbox") {
