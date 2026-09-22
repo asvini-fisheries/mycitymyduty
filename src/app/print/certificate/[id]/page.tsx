@@ -28,20 +28,10 @@ function text(value: unknown, fallback = "—"): string {
   return String(value);
 }
 
-function formatLongDate(iso: string | null | undefined): string {
-  if (!iso) return "—";
-  const date = new Date(`${iso.slice(0, 10)}T00:00:00`);
-  if (Number.isNaN(date.getTime())) return iso.slice(0, 10);
-  return date.toLocaleDateString("en-IN", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
-}
-
-function recordTypeLabel(value: unknown): string {
-  if (value === "requirement") return "requirement";
-  return "project";
+function overlayLengthClass(value: string) {
+  if (value.length > 42) return "is-long";
+  if (value.length > 28) return "is-medium";
+  return "";
 }
 
 export default function AppreciationCertificatePage() {
@@ -101,24 +91,13 @@ export default function AppreciationCertificatePage() {
     );
   }
 
-  const project = firstRecord(row.projects);
-  const corporation = firstRecord(
-    (project?.corporations as Nested) ?? null
-  );
   const stakeholder = firstRecord(row.stakeholders);
   const member = firstRecord(row.stakeholder_members);
   const memberName = text(member?.name, "Participant");
   const stakeholderName = text(stakeholder?.name, "Stakeholder");
-  const projectName = text(project?.name, "the civic programme");
-  const projectCode = project?.code ? String(project.code) : null;
-  const corporationName = text(corporation?.name, "Municipal Corporation");
-  const corporationLogo = corporation?.logo_url
-    ? String(corporation.logo_url)
-    : null;
-  const kind = recordTypeLabel(project?.record_type);
 
   return (
-    <div className="mx-auto max-w-[1100px] p-6">
+    <div className="certificate-print mx-auto max-w-[1123px] p-6">
       <div className="no-print mb-4 flex items-center justify-between gap-3">
         <p className="text-sm text-civic-600">
           Appreciation certificate for {memberName}
@@ -129,83 +108,108 @@ export default function AppreciationCertificatePage() {
       </div>
 
       <style>{`
+        .certificate-sheet {
+          position: relative;
+          width: 100%;
+          aspect-ratio: 1024 / 682;
+          overflow: hidden;
+          background: #fff;
+          container-type: inline-size;
+        }
+        .certificate-sheet img {
+          display: block;
+          width: 100%;
+          height: 100%;
+          object-fit: fill;
+        }
+        .certificate-line {
+          position: absolute;
+          left: 16%;
+          right: 16%;
+          display: flex;
+          align-items: flex-end;
+          justify-content: center;
+          text-align: center;
+          color: #163a57;
+          font-family: Georgia, "Times New Roman", serif;
+          margin: 0;
+          line-height: 1;
+          text-decoration: none;
+          overflow: visible;
+          white-space: nowrap;
+        }
+        .certificate-line--name {
+          top: 41.4%;
+          height: 5.2%;
+          font-size: 2.35cqw;
+          font-weight: 600;
+        }
+        .certificate-line--org {
+          top: 50.6%;
+          height: 5.1%;
+          font-size: 1.95cqw;
+          font-weight: 600;
+        }
+        .certificate-line--name.is-medium { font-size: 1.95cqw; }
+        .certificate-line--org.is-medium { font-size: 1.7cqw; }
+        .certificate-line--name.is-long { font-size: 1.6cqw; }
+        .certificate-line--org.is-long { font-size: 1.45cqw; }
         @media print {
-          @page { size: A4 landscape; margin: 10mm; }
+          @page { size: A4 landscape; margin: 0; }
+          html, body {
+            margin: 0 !important;
+            padding: 0 !important;
+            background: white !important;
+          }
+          .certificate-print {
+            max-width: none !important;
+            margin: 0 !important;
+            padding: 0 !important;
+          }
+          .certificate-sheet {
+            width: 297mm;
+            height: 210mm;
+            aspect-ratio: auto;
+          }
+          .certificate-line {
+            overflow: hidden;
+            line-height: 1.15;
+          }
+          .certificate-line--name {
+            top: 43.4%;
+            height: 3.8%;
+            font-size: 1.7rem;
+            font-weight: 700;
+          }
+          .certificate-line--org {
+            top: 52.5%;
+            height: 3.7%;
+            font-size: 1.35rem;
+            font-weight: 600;
+          }
+          .certificate-line--name.is-medium { font-size: 1.35rem; }
+          .certificate-line--org.is-medium { font-size: 1.15rem; }
+          .certificate-line--name.is-long { font-size: 1.1rem; }
+          .certificate-line--org.is-long { font-size: 0.98rem; }
         }
       `}</style>
-      <article className="relative overflow-hidden rounded-sm border-[10px] border-double border-amber-700 bg-[#fffdf6] px-10 py-12 text-center shadow-sm">
-        <div className="pointer-events-none absolute inset-3 border border-amber-600/40" />
 
-        <div className="relative flex items-center justify-center gap-6">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/mycitymyduty-logo.png"
-            alt="My City My Duty"
-            className="h-16 w-auto rounded bg-white p-1"
-          />
-          {corporationLogo ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={corporationLogo}
-              alt={corporationName}
-              className="h-16 w-16 rounded bg-white object-contain p-1"
-            />
-          ) : null}
-        </div>
-
-        <p className="relative mt-4 text-xs font-semibold uppercase tracking-[0.35em] text-civic-600">
-          {corporationName}
-        </p>
-        <p className="relative mt-1 text-xs uppercase tracking-[0.28em] text-amber-800">
-          My City My Duty
-        </p>
-
-        <h1 className="relative mt-8 font-serif text-4xl font-semibold tracking-wide text-civic-900">
-          Certificate of Appreciation
-        </h1>
-        <p className="relative mx-auto mt-3 max-w-2xl text-sm italic text-civic-600">
-          In recognition of civic participation and service to the city
-        </p>
-
-        <p className="relative mt-10 text-sm uppercase tracking-widest text-civic-500">
-          This certificate is presented to
-        </p>
-        <p className="relative mt-2 font-serif text-3xl font-semibold text-civic-900">
+      <article className="certificate-sheet">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/certificates/coastal-cleanup-2026.jpg"
+          alt="International Coastal Cleanup 2026 certificate"
+        />
+        <p
+          className={`certificate-line certificate-line--name ${overlayLengthClass(memberName)}`}
+        >
           {memberName}
         </p>
-        <p className="relative mt-2 text-base text-civic-700">
-          representing <span className="font-semibold">{stakeholderName}</span>
+        <p
+          className={`certificate-line certificate-line--org ${overlayLengthClass(stakeholderName)}`}
+        >
+          {stakeholderName}
         </p>
-
-        <p className="relative mx-auto mt-8 max-w-3xl text-base leading-relaxed text-civic-800">
-          for participating in the {kind}{" "}
-          <span className="font-semibold">
-            {projectName}
-            {projectCode ? ` (${projectCode})` : ""}
-          </span>{" "}
-          on <span className="font-semibold">{formatLongDate(row.participation_date)}</span>.
-        </p>
-
-        {row.notes ? (
-          <p className="relative mx-auto mt-4 max-w-2xl text-sm italic text-civic-600">
-            {row.notes}
-          </p>
-        ) : null}
-
-        <div className="relative mt-16 grid grid-cols-2 gap-16 px-8 text-sm text-civic-700">
-          <div>
-            <div className="mx-auto mb-2 h-px w-48 bg-civic-400" />
-            <p>Authorised Signatory</p>
-            <p className="text-xs text-civic-500">{corporationName}</p>
-          </div>
-          <div>
-            <div className="mx-auto mb-2 h-px w-48 bg-civic-400" />
-            <p>Date of issue</p>
-            <p className="text-xs text-civic-500">
-              {formatLongDate(row.certificate_issued_at?.slice(0, 10) ?? null)}
-            </p>
-          </div>
-        </div>
       </article>
     </div>
   );
