@@ -14,6 +14,7 @@ import { LogoUploadField } from "@/components/crud/LogoUploadField";
 import { AttachmentViewerModal } from "@/components/crud/AttachmentViewerModal";
 import { ExcelToolbar } from "@/components/crud/ExcelToolbar";
 import { SearchFilterBar } from "@/components/crud/SearchFilterBar";
+import { PaginationBar } from "@/components/crud/PaginationBar";
 import {
   applySearchAndFilters,
   deriveFilterableColumns,
@@ -81,9 +82,10 @@ interface CrudPageProps {
   allowDelete?: boolean;
   allowExcelImport?: boolean;
   excelFileName?: string;
-  printVoucher?: "receipt" | "payment";
+  printVoucher?: "receipt" | "payment" | "certificate";
   defaultLatestCorporation?: boolean;
   skipCorporationScope?: boolean;
+  pageSize?: number;
 }
 
 type Row = Record<string, unknown>;
@@ -109,6 +111,7 @@ export function CrudPage({
   defaultLatestCorporation = false,
   skipCorporationScope = false,
   moduleKey,
+  pageSize,
 }: CrudPageProps) {
   const { isStakeholder, profile } = useAccess();
   const resolvedModuleKey = moduleKey ?? TABLE_MODULE_MAP[table];
@@ -142,6 +145,7 @@ export function CrudPage({
   const [searchQuery, setSearchQuery] = useState("");
   const [columnFilters, setColumnFilters] = useState<Record<string, string>>({});
   const [pendingLogoFiles, setPendingLogoFiles] = useState<Record<string, File>>({});
+  const [page, setPage] = useState(1);
 
   const formFields = useMemo(
     () =>
@@ -186,6 +190,31 @@ export function CrudPage({
       0,
     [searchQuery, columnFilters, filterableColumns]
   );
+
+  const paginationSize = pageSize && pageSize > 0 ? pageSize : 0;
+  const paginationEnabled = paginationSize > 0;
+  const totalPages = paginationEnabled
+    ? Math.max(1, Math.ceil(filteredRows.length / paginationSize))
+    : 1;
+  const currentPage = Math.min(page, totalPages);
+  const pageStartIndex = paginationEnabled
+    ? (currentPage - 1) * paginationSize
+    : 0;
+  const visibleRows = paginationEnabled
+    ? filteredRows.slice(pageStartIndex, pageStartIndex + paginationSize)
+    : filteredRows;
+  const rangeStart = filteredRows.length === 0 ? 0 : pageStartIndex + 1;
+  const rangeEnd = paginationEnabled
+    ? Math.min(pageStartIndex + paginationSize, filteredRows.length)
+    : filteredRows.length;
+
+  useEffect(() => {
+    setPage(1);
+  }, [searchQuery, columnFilters, pageSize]);
+
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
 
   const loadOptions = useCallback(async () => {
     if (!isSupabaseConfigured()) return;
@@ -796,9 +825,11 @@ export function CrudPage({
   function openPrint(row: Row) {
     const id = String(row[idKey]);
     const path =
-      printVoucher === "receipt"
-        ? `/print/receipt/${id}`
-        : `/print/payment/${id}`;
+      printVoucher === "certificate"
+        ? `/print/certificate/${id}`
+        : printVoucher === "receipt"
+          ? `/print/receipt/${id}`
+          : `/print/payment/${id}`;
     window.open(path, "_blank", "noopener,noreferrer");
   }
 
@@ -882,6 +913,8 @@ export function CrudPage({
           filterableColumns={filterableColumns}
           filteredCount={filteredRows.length}
           totalCount={rows.length}
+          rangeStart={paginationEnabled ? rangeStart : undefined}
+          rangeEnd={paginationEnabled ? rangeEnd : undefined}
         />
       )}
 
@@ -940,7 +973,7 @@ export function CrudPage({
                   </td>
                 </tr>
               ) : (
-                filteredRows.map((row) => {
+                visibleRows.map((row) => {
                   const rowAttachments = hasAttachmentsField
                     ? getRowAttachments(row)
                     : [];
@@ -979,8 +1012,16 @@ export function CrudPage({
                             variant="ghost"
                             size="sm"
                             onClick={() => openPrint(row)}
-                            aria-label="Print"
-                            title="Print / PDF"
+                            aria-label={
+                              printVoucher === "certificate"
+                                ? "Issue appreciation certificate"
+                                : "Print"
+                            }
+                            title={
+                              printVoucher === "certificate"
+                                ? "Issue appreciation certificate"
+                                : "Print / PDF"
+                            }
                           >
                             <Printer className="h-4 w-4 text-civic-700" />
                           </Button>
@@ -1029,6 +1070,13 @@ export function CrudPage({
             </tbody>
           </table>
         </div>
+        {paginationEnabled && !loading && !error && filteredRows.length > 0 && (
+          <PaginationBar
+            page={currentPage}
+            totalPages={totalPages}
+            onPageChange={setPage}
+          />
+        )}
       </div>
 
       <AttachmentViewerModal

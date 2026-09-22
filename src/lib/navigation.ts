@@ -1,6 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import {
   Activity,
+  Award,
   Banknote,
   Building2,
   ClipboardList,
@@ -198,6 +199,12 @@ export const navGroups: NavGroup[] = [
   {
     title: "Operations",
     items: [
+      {
+        href: "/dashboard/operations/project-participants",
+        label: "Project Participants",
+        icon: Award,
+        moduleKey: MODULE_KEYS.project_participations,
+      },
       {
         href: "/dashboard/operations/daily-updates",
         label: "Daily Activity Updates",

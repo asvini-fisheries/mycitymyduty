@@ -81,6 +81,7 @@ const DIRECT_ALLOCATION_ROW_COLUMNS: Record<string, string> = {
   projects: "id",
   project_activities: "project_id",
   stakeholder_project_allocations: "project_id",
+  project_member_participations: "project_id",
 };
 
 const NESTED_ALLOCATION_ROW_SCOPES: Record<string, NestedAllocationScope> = {

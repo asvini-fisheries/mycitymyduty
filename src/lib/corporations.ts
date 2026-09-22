@@ -70,6 +70,10 @@ const NESTED_CORPORATION_ROW_SCOPES: Record<string, NestedCorporationScope> = {
     filterColumn: "projects.corporation_id",
     innerJoinSelect: (q) => q.replace("projects(", "projects!inner("),
   },
+  project_member_participations: {
+    filterColumn: "projects.corporation_id",
+    innerJoinSelect: (q) => q.replace("projects(", "projects!inner("),
+  },
   activity_resource_requirements: {
     filterColumn: "project_activities.projects.corporation_id",
     innerJoinSelect: (q) =>
@@ -171,6 +175,8 @@ const NESTED_CORPORATION_OPTION_SCOPES: Record<string, NestedCorporationScope> =
       },
     },
     project_activities: NESTED_CORPORATION_ROW_SCOPES.project_activities,
+    project_member_participations:
+      NESTED_CORPORATION_ROW_SCOPES.project_member_participations,
     daily_activity_updates: {
       filterColumn: "project_activities.projects.corporation_id",
       innerJoinSelect: (q) => {
@@ -183,6 +189,13 @@ const NESTED_CORPORATION_OPTION_SCOPES: Record<string, NestedCorporationScope> =
       },
     },
     stakeholder_bills: {
+      filterColumn: "stakeholders.corporation_id",
+      innerJoinSelect: (q) =>
+        q.includes("stakeholders")
+          ? q.replace("stakeholders(", "stakeholders!inner(")
+          : `${q}, stakeholders!inner(corporation_id)`,
+    },
+    stakeholder_members: {
       filterColumn: "stakeholders.corporation_id",
       innerJoinSelect: (q) =>
         q.includes("stakeholders")

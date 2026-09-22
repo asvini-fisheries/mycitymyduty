@@ -16,6 +16,8 @@ interface SearchFilterBarProps {
   filterableColumns: FilterableColumn[];
   filteredCount: number;
   totalCount: number;
+  rangeStart?: number;
+  rangeEnd?: number;
 }
 
 const compactSelectClass =
@@ -34,6 +36,8 @@ export function SearchFilterBar({
   filterableColumns,
   filteredCount,
   totalCount,
+  rangeStart,
+  rangeEnd,
 }: SearchFilterBarProps) {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const chips = getActiveFilterChips(searchQuery, columnFilters, filterableColumns);
@@ -88,8 +92,23 @@ export function SearchFilterBar({
           </button>
         )}
         <p className="shrink-0 text-xs text-civic-600 sm:ml-auto">
-          Showing <span className="font-semibold text-civic-800">{filteredCount}</span> of{" "}
-          <span className="font-semibold text-civic-800">{totalCount}</span> records
+          {rangeStart != null && rangeEnd != null && filteredCount > 0 ? (
+            <>
+              Showing{" "}
+              <span className="font-semibold text-civic-800">
+                {rangeStart}–{rangeEnd}
+              </span>{" "}
+              of{" "}
+              <span className="font-semibold text-civic-800">{filteredCount}</span>{" "}
+              records
+            </>
+          ) : (
+            <>
+              Showing{" "}
+              <span className="font-semibold text-civic-800">{filteredCount}</span> of{" "}
+              <span className="font-semibold text-civic-800">{totalCount}</span> records
+            </>
+          )}
         </p>
       </div>
 

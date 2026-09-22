@@ -47,6 +47,14 @@ const stakeholderOptionsFrom = {
   labelKey: "name",
 };
 
+const stakeholderMemberOptionsFrom = {
+  table: "stakeholder_members",
+  valueKey: "id",
+  labelKeys: ["name", "phone"],
+  labelSeparator: " — ",
+  selectQuery: "id, name, phone, stakeholder_id",
+};
+
 const stakeholderOptionsFromWithCategory = {
   table: "stakeholders",
   valueKey: "id",
@@ -965,5 +973,87 @@ export const crudConfigs = {
       transactionalAttachmentsField,
     ] as FieldConfig[],
     orderBy: { column: "payment_date", ascending: false },
+  },
+
+  projectMemberParticipations: {
+    title: "Project Participants",
+    description:
+      "Record stakeholder members who participated in a project or requirement on a date. Import from Excel, then issue an appreciation certificate.",
+    table: "project_member_participations",
+    selectQuery:
+      "*, projects(name, code, record_type, corporation_id, corporations(name, logo_url)), stakeholders(name), stakeholder_members(name, phone, role)",
+    columns: [
+      { key: "participation_date", label: "Date" },
+      { key: "projects.record_type", label: "Type" },
+      { key: "projects.name", label: "Project / Requirement" },
+      { key: "stakeholders.name", label: "Stakeholder" },
+      { key: "stakeholder_members.name", label: "Member" },
+      { key: "stakeholder_members.phone", label: "Phone" },
+      { key: "certificate_issued_at", label: "Certificate issued" },
+    ] as ColumnConfig[],
+    fields: [
+      {
+        name: "project_record_type",
+        label: "Type",
+        type: "select",
+        required: true,
+        options: projectRecordTypeOptions,
+        defaultValue: "project",
+        formOnly: true,
+        editValueFrom: "projects.record_type",
+        clearsOnChange: ["project_id"],
+        fullWidth: true,
+      },
+      {
+        name: "project_id",
+        label: "Project",
+        type: "select",
+        required: true,
+        optionsFrom: {
+          ...projectOptionsFrom,
+          filterByFormField: {
+            formField: "project_record_type",
+            rowKey: "record_type",
+          },
+        },
+        dynamicLabel: {
+          field: "project_record_type",
+          labels: {
+            project: "Project",
+            requirement: "Requirement",
+          },
+        },
+      },
+      {
+        name: "stakeholder_id",
+        label: "Stakeholder",
+        type: "select",
+        required: true,
+        optionsFrom: stakeholderOptionsFrom,
+        clearsOnChange: ["stakeholder_member_id"],
+      },
+      {
+        name: "stakeholder_member_id",
+        label: "Member",
+        type: "select",
+        required: true,
+        optionsFrom: {
+          ...stakeholderMemberOptionsFrom,
+          filterByFormField: {
+            formField: "stakeholder_id",
+            rowKey: "stakeholder_id",
+          },
+        },
+      },
+      {
+        name: "participation_date",
+        label: "Participation Date",
+        type: "date",
+        required: true,
+      },
+      { name: "notes", label: "Notes", type: "textarea" },
+      transactionalAttachmentsField,
+    ] as FieldConfig[],
+    orderBy: { column: "participation_date", ascending: false },
   },
 };
