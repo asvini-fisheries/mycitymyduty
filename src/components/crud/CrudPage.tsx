@@ -888,6 +888,69 @@ export function CrudPage({
     setColumnFilters({});
   }
 
+  function renderRowActions(row: Row) {
+    const rowAttachments = hasAttachmentsField ? getRowAttachments(row) : [];
+
+    return (
+      <div className="flex gap-1">
+        {printVoucher && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => openPrint(row)}
+            aria-label={
+              printVoucher === "certificate"
+                ? "Issue appreciation certificate"
+                : "Print"
+            }
+            title={
+              printVoucher === "certificate"
+                ? "Issue appreciation certificate"
+                : "Print / PDF"
+            }
+          >
+            <Printer className="h-4 w-4 text-civic-700" />
+          </Button>
+        )}
+        {hasAttachmentsField && rowAttachments.length > 0 && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => openAttachments(row)}
+            aria-label={`View ${rowAttachments.length} attachment${rowAttachments.length === 1 ? "" : "s"}`}
+            title="View attachments"
+            className="relative"
+          >
+            <Images className="h-4 w-4 text-civic-700" />
+            {rowAttachments.length > 1 && (
+              <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-civic-700 px-1 text-[10px] font-semibold leading-none text-white">
+                {rowAttachments.length}
+              </span>
+            )}
+          </Button>
+        )}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => openEdit(row)}
+          aria-label="Edit"
+          disabled={!canEdit}
+        >
+          <Pencil className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => handleDelete(row)}
+          aria-label="Delete"
+          disabled={!canDelete}
+        >
+          <Trash2 className="h-4 w-4 text-red-600" />
+        </Button>
+      </div>
+    );
+  }
+
   const exportName =
     excelFileName ?? title.replace(/\s+/g, "_").toLowerCase();
 
@@ -952,6 +1015,9 @@ export function CrudPage({
           <table className="w-full min-w-[640px] text-left text-sm">
             <thead className="border-b border-civic-100 bg-civic-50">
               <tr>
+                <th className="sticky left-0 z-20 w-36 whitespace-nowrap bg-civic-50 px-3 py-3 font-semibold text-civic-800 shadow-[2px_0_6px_rgba(14,40,66,0.08)]">
+                  Actions
+                </th>
                 {columns.map((col) => (
                   <th
                     key={col.key}
@@ -960,9 +1026,6 @@ export function CrudPage({
                     {col.label}
                   </th>
                 ))}
-                <th className="w-36 px-4 py-3 font-semibold text-civic-800">
-                  Actions
-                </th>
               </tr>
             </thead>
             <tbody>
@@ -997,15 +1060,14 @@ export function CrudPage({
                 </tr>
               ) : (
                 visibleRows.map((row) => {
-                  const rowAttachments = hasAttachmentsField
-                    ? getRowAttachments(row)
-                    : [];
-
                   return (
                   <tr
                     key={String(row[idKey])}
-                    className="border-b border-civic-50 hover:bg-civic-50/50"
+                    className="group border-b border-civic-50 hover:bg-civic-50/50"
                   >
+                    <td className="sticky left-0 z-10 whitespace-nowrap bg-white px-3 py-3 shadow-[2px_0_6px_rgba(14,40,66,0.08)] group-hover:bg-civic-50">
+                      {renderRowActions(row)}
+                    </td>
                     {columns.map((col) => {
                       const value = getNestedValue(row, col.key);
                       const imageField = fields.find(
@@ -1050,64 +1112,6 @@ export function CrudPage({
                         </td>
                       );
                     })}
-                    <td className="px-4 py-3">
-                      <div className="flex gap-1">
-                        {printVoucher && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => openPrint(row)}
-                            aria-label={
-                              printVoucher === "certificate"
-                                ? "Issue appreciation certificate"
-                                : "Print"
-                            }
-                            title={
-                              printVoucher === "certificate"
-                                ? "Issue appreciation certificate"
-                                : "Print / PDF"
-                            }
-                          >
-                            <Printer className="h-4 w-4 text-civic-700" />
-                          </Button>
-                        )}
-                        {hasAttachmentsField && rowAttachments.length > 0 && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => openAttachments(row)}
-                            aria-label={`View ${rowAttachments.length} attachment${rowAttachments.length === 1 ? "" : "s"}`}
-                            title="View attachments"
-                            className="relative"
-                          >
-                            <Images className="h-4 w-4 text-civic-700" />
-                            {rowAttachments.length > 1 && (
-                              <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-civic-700 px-1 text-[10px] font-semibold leading-none text-white">
-                                {rowAttachments.length}
-                              </span>
-                            )}
-                          </Button>
-                        )}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => openEdit(row)}
-                          aria-label="Edit"
-                          disabled={!canEdit}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDelete(row)}
-                          aria-label="Delete"
-                          disabled={!canDelete}
-                        >
-                          <Trash2 className="h-4 w-4 text-red-600" />
-                        </Button>
-                      </div>
-                    </td>
                   </tr>
                   );
                 })
