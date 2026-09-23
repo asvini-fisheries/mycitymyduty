@@ -61,25 +61,44 @@ function sanitizeFileName(name: string): string {
   return name.replace(/[^a-zA-Z0-9._-]/g, "_");
 }
 
-export async function uploadCorporationLogo(
-  file: File,
-  corporationId: string
-): Promise<string> {
+function safeImageExt(file: File, fallback: string): string {
+  const ext = file.name.split(".").pop()?.toLowerCase() || fallback;
+  return ["jpg", "jpeg", "png", "webp"].includes(ext) ? ext : fallback;
+}
+
+export function storagePathFromPublicUrl(publicUrl: string): string | null {
+  try {
+    const url = new URL(publicUrl);
+    const marker = `/object/public/${ATTACHMENTS_BUCKET}/`;
+    const idx = url.pathname.indexOf(marker);
+    if (idx === -1) return null;
+    return decodeURIComponent(url.pathname.slice(idx + marker.length));
+  } catch {
+    return null;
+  }
+}
+
+export async function removeAttachmentByUrl(publicUrl: string): Promise<void> {
+  const path = storagePathFromPublicUrl(publicUrl);
+  if (!path) return;
+  const supabase = createClient();
+  await supabase.storage.from(ATTACHMENTS_BUCKET).remove([path]);
+}
+
+async function uploadUniqueImage(file: File, folder: string): Promise<string> {
   const validationError = validateImageFile(file);
   if (validationError) {
     throw new Error(validationError);
   }
 
   const supabase = createClient();
-  const ext = file.name.split(".").pop()?.toLowerCase() || "png";
-  const safeExt = ["jpg", "jpeg", "png", "webp"].includes(ext) ? ext : "png";
-  const objectPath = `corporations/${corporationId}/logo.${safeExt}`;
+  const objectPath = `${folder}/${crypto.randomUUID()}.${safeImageExt(file, "png")}`;
 
   const { error: uploadError } = await supabase.storage
     .from(ATTACHMENTS_BUCKET)
     .upload(objectPath, file, {
       cacheControl: "3600",
-      upsert: true,
+      upsert: false,
       contentType: file.type,
     });
 
@@ -88,37 +107,23 @@ export async function uploadCorporationLogo(
   }
 
   const { data } = supabase.storage.from(ATTACHMENTS_BUCKET).getPublicUrl(objectPath);
-  return data.publicUrl;
+  const url = new URL(data.publicUrl);
+  url.searchParams.set("v", Date.now().toString());
+  return url.toString();
+}
+
+export async function uploadCorporationLogo(
+  file: File,
+  corporationId: string
+): Promise<string> {
+  return uploadUniqueImage(file, `corporations/${corporationId}/logo`);
 }
 
 export async function uploadCertificateTemplate(
   file: File,
   projectId: string
 ): Promise<string> {
-  const validationError = validateImageFile(file);
-  if (validationError) {
-    throw new Error(validationError);
-  }
-
-  const supabase = createClient();
-  const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
-  const safeExt = ["jpg", "jpeg", "png", "webp"].includes(ext) ? ext : "jpg";
-  const objectPath = `projects/${projectId}/certificate-template.${safeExt}`;
-
-  const { error: uploadError } = await supabase.storage
-    .from(ATTACHMENTS_BUCKET)
-    .upload(objectPath, file, {
-      cacheControl: "3600",
-      upsert: true,
-      contentType: file.type,
-    });
-
-  if (uploadError) {
-    throw new Error(uploadError.message);
-  }
-
-  const { data } = supabase.storage.from(ATTACHMENTS_BUCKET).getPublicUrl(objectPath);
-  return data.publicUrl;
+  return uploadUniqueImage(file, `projects/${projectId}/certificate-template`);
 }
 
 export async function uploadAttachmentFile(

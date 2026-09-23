@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ImagePlus, Loader2, Trash2 } from "lucide-react";
 import { uploadCorporationLogo, validateImageFile } from "@/lib/attachments";
 import { Button } from "@/components/ui/Button";
@@ -33,6 +33,21 @@ export function LogoUploadField({
   const [error, setError] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
+  useEffect(() => {
+    setPreviewUrl((current) => {
+      if (current) URL.revokeObjectURL(current);
+      return null;
+    });
+    setError(null);
+  }, [recordId]);
+
+  function replacePreview(nextUrl: string | null) {
+    setPreviewUrl((current) => {
+      if (current) URL.revokeObjectURL(current);
+      return nextUrl;
+    });
+  }
+
   async function handleFileSelect(files: FileList | null) {
     const file = files?.[0];
     if (!file) return;
@@ -44,7 +59,7 @@ export function LogoUploadField({
     }
 
     setError(null);
-    setPreviewUrl(URL.createObjectURL(file));
+    replacePreview(URL.createObjectURL(file));
     onFileSelected?.(file);
 
     if (!recordId) {
@@ -57,6 +72,7 @@ export function LogoUploadField({
         ? await onUpload(file, recordId)
         : await uploadCorporationLogo(file, recordId);
       onChange(url);
+      onFileSelected?.(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed.");
     } finally {
@@ -70,7 +86,7 @@ export function LogoUploadField({
   function handleRemove() {
     onChange("");
     onFileSelected?.(null);
-    setPreviewUrl(null);
+    replacePreview(null);
     setError(null);
     if (inputRef.current) {
       inputRef.current.value = "";

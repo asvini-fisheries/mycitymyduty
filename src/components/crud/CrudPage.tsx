@@ -25,6 +25,7 @@ import {
 } from "@/lib/crud-filters";
 import {
   parseAttachments,
+  removeAttachmentByUrl,
   serializeAttachments,
   uploadCorporationLogo,
   uploadCertificateTemplate,
@@ -564,7 +565,32 @@ export function CrudPage({
       }
       const logoFields = formFields.filter((field) => field.type === "logo");
 
+      async function persistPendingLogo(
+        recordId: string,
+        payload: Record<string, unknown>,
+        originalRow?: Row | null
+      ) {
+        for (const field of logoFields) {
+          const pendingFile = pendingLogoFiles[field.name];
+          if (!pendingFile) continue;
+          const currentUrl = payload[field.name]
+            ? String(payload[field.name])
+            : "";
+          const originalUrl = originalRow?.[field.name]
+            ? String(originalRow[field.name])
+            : "";
+          if (currentUrl && currentUrl !== originalUrl) continue;
+          payload[field.name] =
+            field.imageKind === "certificate"
+              ? await uploadCertificateTemplate(pendingFile, recordId)
+              : await uploadCorporationLogo(pendingFile, recordId);
+        }
+      }
+
       if (editing) {
+        const recordId = String(editing[idKey]);
+        await persistPendingLogo(recordId, scopedPayload, editing);
+
         const result = await supabase
           .from(table)
           .update(scopedPayload)
@@ -578,7 +604,19 @@ export function CrudPage({
             alert(msg);
           }
         } else {
+          for (const field of logoFields) {
+            const prev = editing[field.name]
+              ? String(editing[field.name])
+              : "";
+            const next = scopedPayload[field.name]
+              ? String(scopedPayload[field.name])
+              : "";
+            if (prev && prev !== next) {
+              void removeAttachmentByUrl(prev);
+            }
+          }
           setModalOpen(false);
+          setPendingLogoFiles({});
           await loadRows();
         }
       } else {
@@ -665,7 +703,7 @@ export function CrudPage({
     if (field.type === "logo") {
       return (
         <LogoUploadField
-          key={field.name}
+          key={`${field.name}-${editing ? String(editing[idKey]) : "new"}`}
           name={field.name}
           label={label}
           value={value}
@@ -1080,6 +1118,7 @@ export function CrudPage({
                             {url ? (
                               // eslint-disable-next-line @next/next/no-img-element
                               <img
+                                key={url}
                                 src={url}
                                 alt={imageField.label}
                                 className={
